@@ -1,0 +1,24 @@
+# 示例：学习教练 System Prompt 的结构描述
+prompt:
+  description: "myKG 学习教练 System Prompt"
+  separator: "\n\n---\n\n"
+
+  composition:
+    # Part 1: 角色 — 固定文件
+    - file: coach/role.md
+      description: "角色定义"
+
+    # Part 2: 业务规则 — 固定文件
+    - file: coach/rules.md
+      description: "业务规则"
+
+    # Part 3: 推荐策略 — 根据 strategy 变量切换文件
+    - switch:
+        variable: strategy
+        cases:
+          topo: coach/strategy_topo.md
+          adaptive: coach/strategy_adaptive.md
+        default: coach/strategy_topo.md
+
+    # Part 4: 运行时上下文 — 行内模板
+    - template: "## 当前上下文\n- 学习领域: {{ domain | default('未指定') }}\n- 策略: {{ strategy | default('topo') }}\n- 模型: {{ env.WEAVE_MODEL | default('claude') }}"

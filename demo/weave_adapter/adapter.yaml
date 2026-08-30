@@ -1,0 +1,12 @@
+# 适配层翻译表：业务概念 ↔ weave scope/namespace。
+# agent.py 全部从这里读取，代码中不含任何 scope 名 / world_id / 变量名字面量。
+scope_names:
+  persona: persona              # 私有 scope 名（须与 weave.yaml memory.scopes 一致）
+  world: world                  # 共享 scope 名
+world_id: shared                # 共享 scope 的固定 scope_id
+context_keys:
+  name: persona_name            # 对应 prompt 模板 {{ persona_name }}
+  role: persona_role            # 对应 prompt 模板 {{ persona_role }}
+state_keys:
+  last_answer: last_answer      # 私有 state：人设最近一次回答的键
+  objective_facts: objective_facts  # 共享 state：客观事实列表的键（全量注入）

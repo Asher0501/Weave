@@ -1,0 +1,17 @@
+# Weave 默认配置（精简版）。
+# 完整可选项（loop 全部旋钮、memory 作用域、features、server、logging）见
+# docs/config-reference.yaml。所有敏感信息（api_key 等）均从环境变量读取。
+
+agent:
+  name: default
+
+llm:
+  provider: anthropic            # anthropic | openai | deepseek
+  model: ${WEAVE_MODEL:-claude-sonnet-5-20251001}
+
+loop:
+  type: iterative                # simple | iterative | scheduled（默认 iterative）
+  max_iterations: 10
+
+prompts:
+  system: prompts/system.md      # 未配置时用内置默认 prompt（C1）

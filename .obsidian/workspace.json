@@ -1,0 +1,221 @@
+{
+  "main": {
+    "id": "f2135363b0b322c4",
+    "type": "split",
+    "children": [
+      {
+        "id": "071f0b49e5ebe85c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b2ec3e516c176f61",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "b7a6d1334a2b467a",
+    "type": "split",
+    "children": [
+      {
+        "id": "e5ef7ffba164a08a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c9cf55bd78725698",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "ce1b7fdb11b0b33c",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "d4abe1c577921b8f",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "5ab32fb7d52dd2e5",
+    "type": "split",
+    "children": [
+      {
+        "id": "8d747b359e672cb9",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5101fc016b3cb063",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "DESIGN.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for DESIGN"
+            }
+          },
+          {
+            "id": "e074a7c32fa54fc3",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "DESIGN.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from DESIGN"
+            }
+          },
+          {
+            "id": "e8546bf3f22f026e",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "ff3210fc4cfeb707",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "4b35565efc53cb9b",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "DESIGN.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of DESIGN"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "c9cf55bd78725698",
+  "lastOpenFiles": [
+    "weave/agent.py.tmp.25464.47bd2696b183",
+    "docs/public-api.md.tmp.25464.b89280febebc",
+    "weave/__init__.py.tmp.25464.b1bff4787ab1",
+    "tests/__pycache__/test_registry.cpython-313-pytest-8.4.2.pyc",
+    "tests/test_registry.py",
+    "tests/test_registry.py.tmp.25464.1eb12960a1a7",
+    "demo/data/memory.db-shm",
+    "demo/weave_adapter/agent.py.tmp.25464.1509b4bc659f",
+    "demo/weave_adapter/agent.py.tmp.25464.756481045ec7",
+    "tests/__pycache__/test_weave.cpython-313-pytest-8.4.2.pyc.44964",
+    "tests/test_weave.py.tmp.25464.1aec0943866b",
+    "docs/issues/011-adapter-quality.md",
+    "docs/issues/010-pluggability.md",
+    "docs/issues/009-llm-injection-point.md",
+    "docs/issues/008-llm-auth-model-resolution.md",
+    "docs/issues/007-llm-reasoning-content.md",
+    "docs/issues/006-knowledge-search-cjk.md",
+    "docs/issues/005-prompt-path-resolution.md",
+    "demo/README.md",
+    "weave/prompts/defaults/system.md",
+    "docs/history/nexus/test_record.md",
+    "docs/history/nexus/review_record.md",
+    "docs/history/nexus/fix_record.md",
+    "docs/history/review_record.md",
+    "nexus/fix_record.md",
+    "nexus/review_record.md",
+    "nexus/test_record.md",
+    "nexus/_round18_section.md",
+    "nexus/_restore_test2.md",
+    "nexus/_restore_test.md",
+    "nexus/_round17_append.md",
+    "nexus/_round15_tmp.md",
+    "nexus/_round14_append.md",
+    "nexus/_round12_tmp.md",
+    "nexus/_round11_draft.md",
+    "nexus/_round10_append.md"
+  ]
+}

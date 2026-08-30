@@ -1,0 +1,19 @@
+# 示例：Phase 3 学习目标生成 Schema（带工具声明）
+# 演示 tools: 字段——声明式工具选择
+prompt:
+  description: "Phase 3: 学习目标生成"
+  separator: "\n\n"
+
+  composition:
+    - file: coach/role.md
+    - file: coach/rules.md
+    - template: "## Phase 3: 学习目标生成\n请根据当前知识图谱生成学习目标。"
+
+  # 工具声明：Phase 3 只注册需要的工具
+  # LLM 看不到 node_remove、edge_remove、node_update 等不该用的工具
+  tools:
+    - include: tools/node_add.yaml
+    - include: tools/edge_add.yaml
+    - include: tools/graph_decompose.yaml
+    - include: tools/ask_user.yaml
+    - include: tools/node_list.yaml

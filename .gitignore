@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 运行时数据（SQLite 等）
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# 备份
+*.bak

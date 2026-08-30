@@ -1,0 +1,26 @@
+# Weave 配置（全 YAML，代码零硬编码）。
+agent:
+  name: personas
+
+llm:
+  provider: ${LLM_PROVIDER:-anthropic}   # anthropic | openai | deepseek（默认 anthropic：读取 ANTHROPIC_AUTH_TOKEN）
+  model: ${WEAVE_MODEL:-deepseek-chat}   # 默认用能正常出文本的 chat 模型（deepseek-v4-pro 是推理模型，输出在 thinking block）
+
+loop:
+  type: simple                  # 一次请求-响应，不调 Tool
+  max_iterations: 3
+
+memory:
+  default_backend: sqlite
+  default_path: ./data/memory.db
+  scopes:
+    persona:                    # 私有：按 persona_id 隔离（会话 + 保存结果）
+      priority: 0
+      stream: { backend: sqlite }
+      state:  { backend: sqlite }
+    world:                      # 共享：客观上下文（外部数据），world_id 恒为 shared
+      priority: 10
+      state:  { backend: sqlite }
+
+prompts:
+  system: system                # 裸名 → registry 加载 prompts/system.schema.yaml

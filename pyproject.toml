@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weave"
+version = "0.1.0"
+description = "Non-intrusive Agent SDK with pluggable Loop and Memory mechanisms"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Weave Contributors"}
+]
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.39.0"]
+openai = ["openai>=1.0"]
+chromadb = ["chromadb>=0.5.0"]
+server = ["fastapi>=0.100", "uvicorn>=0.30", "websockets>=12.0"]
+all = [
+    "anthropic>=0.39.0",
+    "openai>=1.0",
+    "chromadb>=0.5.0",
+    "fastapi>=0.100",
+    "uvicorn>=0.30",
+    "websockets>=12.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*", "examples*"]
+
+[tool.setuptools.package-data]
+weave = ["prompts/defaults/*.md"]
