@@ -174,6 +174,9 @@ class LoopConfig:
     memory_knowledge_topk: int = 5   # before_think 知识检索注入条数上限（top_k）
     messages_window: int = 20        # iterative LLM 消息窗口条数上限（裁剪最旧对话）
     event_min_interval: float = 1.0  # 事件驱动 scheduled 最小触发间隔（秒）
+    llm_retry_attempts: int = 3      # 非流式 LLM 调用重试次数（1=不重试），非功能（可靠性）
+    llm_retry_backoff: float = 2.0   # 重试退避倍率（非功能）
+    llm_call_timeout: float = 120.0  # 单次非流式 LLM 调用的硬超时（秒），非功能（时效性）
 
 
 @dataclass(slots=True)

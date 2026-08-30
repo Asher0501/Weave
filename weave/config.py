@@ -126,12 +126,12 @@ def _validate_raw(raw: dict) -> None:
     # 数值字段：int / float
     int_fields = {
         "llm": ["max_tokens"],
-        "loop": ["max_iterations", "memory_context_limit", "messages_window"],
+        "loop": ["max_iterations", "memory_context_limit", "messages_window", "llm_retry_attempts"],
         "server": ["port"],
     }
     float_fields = {
         "llm": ["temperature"],
-        "loop": ["timeout", "tool_timeout", "llm_timeout", "event_min_interval"],
+        "loop": ["timeout", "tool_timeout", "llm_timeout", "event_min_interval", "llm_retry_backoff", "llm_call_timeout"],
     }
 
     for (section, field), allowed in enum_fields.items():
@@ -273,6 +273,9 @@ def load_config(config_path: str | Path) -> WeaveConfig:
             # 下限为 3（review round-3 issue 2）。
             messages_window=max(3, int(loop_raw.get("messages_window", 20))),
             event_min_interval=float(loop_raw.get("event_min_interval", 1.0)),
+            llm_retry_attempts=int(loop_raw.get("llm_retry_attempts", 3)),
+            llm_retry_backoff=float(loop_raw.get("llm_retry_backoff", 2.0)),
+            llm_call_timeout=float(loop_raw.get("llm_call_timeout", 120.0)),
         ),
         memory=MemoryConfig(
             scopes=_parse_memory_scopes(memory_raw.get("scopes", {})),

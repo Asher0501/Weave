@@ -428,6 +428,11 @@ class Weave:
         self.__dict__.pop("_memory_writes", None)
 
         try:
+            # 0. 非功能：prompt 注入防御（默认关闭；features.prompt_defense: true 时生效）
+            if self._config.features.prompt_defense:
+                from weave.features.prompt_defense import sanitize
+                input, _detected = sanitize(input)
+
             # 1. 激活 Memory scope
             self._memory.activate_scopes(scope_hints)
 

@@ -279,12 +279,7 @@ async def call_llm(agent: Any, messages: list[Any], tools: list[dict[str, Any]] 
     agent.__dict__["_llm_in_flight"] = True
     agent.__dict__["_llm_in_flight_since"] = time.monotonic()
     try:
-        response = await agent._llm.chat(
-            messages=messages,
-            tools=tools,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
+        response = await _chat_with_retry(agent, messages, tools, max_tokens, temperature)
         if streaming:
             # 有 tools 时无法安全使用 chat_stream（会丢失 tool_calls），
             # 以单条 token 事件输出完整文本，保证事件契约可用。
@@ -297,6 +292,47 @@ async def call_llm(agent: Any, messages: list[Any], tools: list[dict[str, Any]] 
         agent.__dict__.pop("_llm_in_flight", None)
         agent.__dict__.pop("_llm_in_flight_since", None)
     return response
+
+
+async def _chat_with_retry(
+    agent: Any,
+    messages: list[Any],
+    tools: list[dict[str, Any]] | None,
+    max_tokens: int,
+    temperature: float,
+) -> LLMResponse:
+    """带重试 + 硬超时的非流式 LLM 调用（非功能：可靠性 / 时效性）。
+
+    接线在 call_llm；重试仅针对瞬态错误（网络 / 限流 / 服务端 5xx），
+    认证 / 参数 / 上下文超长等错误不重试。参数由 loop 配置驱动（默认生效，
+    宿主一般无需感知），排查问题时见 docs/internal-utilities.md。
+    """
+    from weave.llm.errors import NetworkError, RateLimitError, ServerError
+    from weave.utils.retry import retry
+    from weave.utils.timeout import timeout as _weave_timeout
+
+    retry_attempts = getattr(agent._config.loop, "llm_retry_attempts", 3)
+    if not isinstance(retry_attempts, int) or retry_attempts < 1:
+        retry_attempts = 3
+    retry_backoff = getattr(agent._config.loop, "llm_retry_backoff", 2.0)
+    if not isinstance(retry_backoff, (int, float)) or retry_backoff <= 0:
+        retry_backoff = 2.0
+    call_timeout = getattr(agent._config.loop, "llm_call_timeout", 120.0)
+    if not isinstance(call_timeout, (int, float)) or call_timeout <= 0:
+        call_timeout = 120.0
+
+    # timeout 覆盖整个重试序列的硬上限；retry 处理单次调用的瞬态失败
+    async with _weave_timeout(call_timeout):
+        return await retry(
+            agent._llm.chat,
+            messages=messages,
+            tools=tools,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            max_attempts=retry_attempts,
+            backoff=retry_backoff,
+            retryable=(NetworkError, RateLimitError, ServerError),
+        )
 
 
 def format_memory_context(ctx: dict[str, Any]) -> str:

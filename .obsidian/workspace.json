@@ -181,17 +181,18 @@
   },
   "active": "c9cf55bd78725698",
   "lastOpenFiles": [
-    "weave/agent.py.tmp.25464.47bd2696b183",
-    "docs/public-api.md.tmp.25464.b89280febebc",
-    "weave/__init__.py.tmp.25464.b1bff4787ab1",
-    "tests/__pycache__/test_registry.cpython-313-pytest-8.4.2.pyc",
-    "tests/test_registry.py",
-    "tests/test_registry.py.tmp.25464.1eb12960a1a7",
-    "demo/data/memory.db-shm",
-    "demo/weave_adapter/agent.py.tmp.25464.1509b4bc659f",
-    "demo/weave_adapter/agent.py.tmp.25464.756481045ec7",
-    "tests/__pycache__/test_weave.cpython-313-pytest-8.4.2.pyc.44964",
-    "tests/test_weave.py.tmp.25464.1aec0943866b",
+    "weave/utils/__pycache__/timeout.cpython-313.pyc",
+    "weave/utils/__pycache__/retry.cpython-313.pyc",
+    "weave/features/__pycache__/prompt_defense.cpython-313.pyc",
+    "docs/internal-utilities.md",
+    "docs/internal-utilities.md.tmp.25464.401a46fefb87",
+    "docs/public-api.md.tmp.25464.34b3f7367730",
+    "docs/public-api.md.tmp.25464.5bb73cee4f8a",
+    "docs/public-api.md.tmp.25464.d80465c45f41",
+    "weave/agent.py.tmp.25464.1556763b4108",
+    "weave/loop/base.py.tmp.25464.ed7449a3c600",
+    "weave/loop/base.py.tmp.25464.203e2bf890a5",
+    "weave/config.py.tmp.25464.55c37dd2f66b",
     "docs/issues/011-adapter-quality.md",
     "docs/issues/010-pluggability.md",
     "docs/issues/009-llm-injection-point.md",
@@ -215,7 +216,6 @@
     "nexus/_round15_tmp.md",
     "nexus/_round14_append.md",
     "nexus/_round12_tmp.md",
-    "nexus/_round11_draft.md",
-    "nexus/_round10_append.md"
+    "nexus/_round11_draft.md"
   ]
 }

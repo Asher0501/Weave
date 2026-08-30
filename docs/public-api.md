@@ -73,8 +73,6 @@ LoopResult = namedtuple("LoopResult", [
 |------|------|------|
 | `load_config()` | `(config_path: str \| Path) -> WeaveConfig` | 加载配置文件 |
 | `extract_json()` | `(text: str) -> dict \| list` | 从 LLM 文本中提取 JSON |
-| `retry()` | `(fn, *args, max_attempts=3, backoff=2.0, jitter=0.1, retryable=None, **kwargs) -> T` | 异步重试 |
-| `timeout()` | `(seconds: float) -> AsyncContextManager` | 异步超时 |
 
 ### 1.5 REST API 端点
 
@@ -164,7 +162,7 @@ register_memory_backend("redis", RedisBackend)       # backend: redis
 | `MemoryManager` | `._backends`, `._active_scopes`, `._config` | 内部状态 |
 | `MemoryManager` | `._get_backend_for_namespace()`, `activate_scopes()` | 内部方法 |
 | `EventBus` | `._subscribers`, `._max_queue_size` | 内部状态 |
-| `Config` | `_resolve_env()`, `_resolve_dict()`, `_load_claude_env()`, `_parse_memory_scopes()` | 内部函数 |
+| `Config` | `_resolve_env()`, `_load_claude_env()`, `_parse_memory_scopes()` | 内部函数 |
 | `LLM` | `_auto_detect_provider()`, `_resolve_api_key()`, `_default_model()` | 内部函数 |
 | `IterativeLoop` | `_build_tool_schemas()`, `_execute_tool()`, `_is_finish_tool()`, `_format_tool_result()` | 内部 helper |
 
@@ -177,10 +175,7 @@ register_memory_backend("redis", RedisBackend)       # backend: redis
 | `weave.features.schema_validation` | `validate_schema(data, schema) -> (instance, error)` | Pydantic 校验 |
 | `weave.features.structured_call` | `structured_call(llm, prompt, schema, ...) -> Any` | 结构化 LLM 调用 |
 | `weave.features.two_stage` | `two_stage_call(understand_prompt, translate_schema, ...) -> Any` | 两阶段 LLM |
-| `weave.features.prompt_defense` | `sanitize(user_input, max_length=2000, strategy="defend") -> str` | Prompt 防御 |
 | `weave.utils.json_extract` | `extract_json(text) -> dict\|list` | JSON 提取 |
-| `weave.utils.retry` | `retry(fn, ..., max_attempts, backoff, jitter, retryable) -> T` | 异步重试 |
-| `weave.utils.timeout` | `timeout(seconds) -> AsyncContextManager` | 异步超时 |
 
 ---
 
