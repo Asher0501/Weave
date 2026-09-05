@@ -55,7 +55,7 @@ python agent.py              # 直接跑
 ### 5 行代码
 
 ```python
-from weave import Weave
+from weave_agent_sdk import Weave
 
 weave = Weave("weave.yaml")          # 1. 加载配置
 
@@ -180,7 +180,7 @@ flowchart TB
 内置实现只是「预注册的默认值」，宿主可注册自定义实现，并经配置引用：
 
 ```python
-from weave import register_llm, register_loop, register_memory_backend
+from weave_agent_sdk import register_llm, register_loop, register_memory_backend
 
 register_llm("my_gateway", my_gateway_factory)       # llm.provider: my_gateway
 register_loop("human_review", HumanReviewLoop)        # loop.type: human_review

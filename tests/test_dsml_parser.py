@@ -5,8 +5,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from weave.llm.dsml_parser import has_dsml, parse_dsml_tool_calls
-from weave.types import ToolCall
+from weave_agent_sdk.llm.dsml_parser import has_dsml, parse_dsml_tool_calls
+from weave_agent_sdk.types import ToolCall
 
 
 class TestDSMLParser(unittest.TestCase):

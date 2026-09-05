@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import py_compile
 
-from weave.cli import init_project
-from weave.config import load_config
+from weave_agent_sdk.cli import init_project
+from weave_agent_sdk.config import load_config
 
 
 def test_init_generates_skeleton(tmp_path, capsys):
@@ -45,6 +45,6 @@ def test_init_is_idempotent(tmp_path, capsys):
 
 
 def test_init_rejects_cli_without_command(capsys):
-    from weave.cli import main
+    from weave_agent_sdk.cli import main
     # 无子命令时打印 help 并返回非零
     assert main([]) == 1

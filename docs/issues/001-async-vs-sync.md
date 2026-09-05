@@ -50,7 +50,7 @@ await some_coro()
 ## 接口示例
 
 ```python
-from weave import Weave
+from weave_agent_sdk import Weave
 
 weave = Weave("weave.yaml")
 

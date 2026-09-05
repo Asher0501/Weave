@@ -8,7 +8,7 @@ import unittest
 # Ensure weave module is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from weave.prompts.schema import (
+from weave_agent_sdk.prompts.schema import (
     parse_schema, render_schema, resolve_tool_names,
     PromptSchema, ToolRef, FilePart, SwitchPart, SwitchConfig, TemplatePart,
 )

@@ -58,10 +58,10 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from weave.agent import Weave
-from weave.config import _resolve_env, load_config
-from weave.types import LoopResult
-from weave.utils.env import load_claude_env
+from weave_agent_sdk.agent import Weave
+from weave_agent_sdk.config import _resolve_env, load_config
+from weave_agent_sdk.types import LoopResult
+from weave_agent_sdk.utils.env import load_claude_env
 
 
 # ============================================================
@@ -169,12 +169,12 @@ class TestStreamRaceCondition:
         weave._config.loop.timeout = 5.0
 
         # Mock event bus
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
         weave._event_bus = EventBus()
 
         # Mock LLM
         weave._llm = AsyncMock()
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         weave._llm.chat = AsyncMock(return_value=LLMResponse(
             content="Hello from mock LLM",
             model="test-model",
@@ -467,11 +467,11 @@ class TestStreamDeadlock:
         weave._config.loop.type = "simple"
         weave._config.loop.timeout = 5.0
 
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
         weave._event_bus = EventBus()
 
         weave._llm = AsyncMock()
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         weave._llm.chat = AsyncMock(return_value=LLMResponse(
             content="Hello from mock LLM",
             model="test-model",
@@ -613,7 +613,7 @@ class TestNoHardcodedPrompt:
     def test_no_hardcoded_fallback_string_exists(self):
         """验证代码中不存在 'You are a helpful AI assistant' 硬编码字符串。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave._load_system_prompt)
         assert "You are a helpful AI assistant" not in source
@@ -708,7 +708,7 @@ class TestBakFileCleanup:
 
     def test_no_bak_files_in_weave_source(self):
         """weave/ 目录下不应存在任何 .bak 文件。"""
-        weave_pkg_dir = Path(__file__).parent.parent / "weave"
+        weave_pkg_dir = Path(__file__).parent.parent / "weave_agent_sdk"
         bak_files = list(weave_pkg_dir.rglob("*.bak"))
         assert len(bak_files) == 0, f"Found .bak files in weave/ source: {bak_files}"
 
@@ -730,35 +730,35 @@ class TestSharedLoadClaudeEnv:
     def test_config_imports_from_utils_env(self):
         """config.py 应导入共享的 load_claude_env，而非本地定义。"""
         import inspect
-        import weave.config as cfg
+        import weave_agent_sdk.config as cfg
         # 验证 config 模块中不再有 _load_claude_env 本地定义
         assert not hasattr(cfg, '_load_claude_env')
         # 验证 config 确实从 utils.env 导入了
         source = inspect.getsource(cfg)
-        assert 'from weave.utils.env import load_claude_env' in source
+        assert 'from weave_agent_sdk.utils.env import load_claude_env' in source
 
     def test_factory_imports_from_utils_env(self):
         """factory.py 应导入共享的 load_claude_env，而非本地定义。"""
         import inspect
-        import weave.llm.factory as factory
+        import weave_agent_sdk.llm.factory as factory
         # 验证 factory 模块中不再有 _load_claude_env 本地定义
         assert not hasattr(factory, '_load_claude_env')
         # 验证 factory 确实从 utils.env 导入了
         source = inspect.getsource(factory)
-        assert 'from weave.utils.env import load_claude_env' in source
+        assert 'from weave_agent_sdk.utils.env import load_claude_env' in source
 
     def test_both_use_same_function(self):
         """config.py 和 factory.py 使用相同的 load_claude_env 函数引用。"""
-        from weave.config import load_config as _
-        from weave.llm.factory import create_llm as _
-        from weave.utils.env import load_claude_env as shared_fn
+        from weave_agent_sdk.config import load_config as _
+        from weave_agent_sdk.llm.factory import create_llm as _
+        from weave_agent_sdk.utils.env import load_claude_env as shared_fn
         # 通过测试两处导入均正常工作来验证一致性
         assert callable(shared_fn)
 
     def test_load_claude_env_has_proper_error_handling(self):
         """共享函数应包含完整的异常分类处理（静默 FileNotFoundError + 记录警告）。"""
         import inspect
-        from weave.utils.env import load_claude_env
+        from weave_agent_sdk.utils.env import load_claude_env
         source = inspect.getsource(load_claude_env)
         # 应包含分类异常处理
         assert 'FileNotFoundError' in source
@@ -836,14 +836,14 @@ class TestStreamTimeoutConfigurable:
 
     def test_loop_config_has_timeout_field(self):
         """LoopConfig 应包含 timeout 字段，默认值 5.0。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
         config = LoopConfig()
         assert hasattr(config, "timeout")
         assert config.timeout == 5.0
 
     def test_loop_config_timeout_customizable(self):
         """LoopConfig.timeout 应可自定义。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
         config = LoopConfig(timeout=10.0)
         assert config.timeout == 10.0
 
@@ -897,7 +897,7 @@ class TestStreamTimeoutConfigurable:
         weave._config.loop.type = "simple"
         weave._config.loop.timeout = 3.0  # 自定义超时
 
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
         weave._event_bus = EventBus()
         weave._llm = AsyncMock()
         weave._memory = MagicMock()
@@ -928,7 +928,7 @@ class TestStreamTimeoutConfigurable:
     def test_agent_code_uses_config_timeout(self):
         """验证 agent.py 中 stream() 使用了 self._config.loop.timeout 而非硬编码值。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave.stream)
         # 应使用配置的 timeout
@@ -948,7 +948,7 @@ class TestSharedLoadClaudeEnvIntegration:
     def test_load_config_calls_load_claude_env(self, tmp_path):
         """load_config() 内部应调用 load_claude_env()（通过 mock 验证调用链）。"""
         import yaml
-        from weave.config import load_config
+        from weave_agent_sdk.config import load_config
 
         yaml_path = tmp_path / "test_integration.yaml"
         config_data = {
@@ -965,7 +965,7 @@ class TestSharedLoadClaudeEnvIntegration:
             yaml.dump(config_data, f)
 
         # Mock load_claude_env to verify it gets called
-        with patch("weave.config.load_claude_env") as mock_load_claude_env:
+        with patch("weave_agent_sdk.config.load_claude_env") as mock_load_claude_env:
             result = load_config(yaml_path)
             mock_load_claude_env.assert_called_once()
 
@@ -979,11 +979,11 @@ class TestSharedLoadClaudeEnvIntegration:
 
         为避免环境中的真实 API Key 干扰，同时 mock _resolve_api_key 返回 None。
         """
-        from weave.llm.factory import create_llm
+        from weave_agent_sdk.llm.factory import create_llm
 
-        with patch("weave.llm.factory.load_claude_env") as mock_load_claude_env:
+        with patch("weave_agent_sdk.llm.factory.load_claude_env") as mock_load_claude_env:
             # Mock _resolve_api_key to return None so create_llm raises ValueError
-            with patch("weave.llm.factory._resolve_api_key", return_value=None):
+            with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value=None):
                 with pytest.raises(ValueError, match="No API key"):
                     create_llm(provider="anthropic")
                 mock_load_claude_env.assert_called_once()
@@ -1020,7 +1020,7 @@ class TestStreamTimeoutPropagation:
             weave._config.loop.type = "simple"
             weave._config.loop.timeout = timeout_val
 
-            from weave.event_bus import EventBus
+            from weave_agent_sdk.event_bus import EventBus
             weave._event_bus = EventBus()
             weave._llm = AsyncMock()
             weave._memory = MagicMock()
@@ -1059,7 +1059,7 @@ class TestStreamTimeoutPropagation:
         weave._config.loop.type = "simple"
         weave._config.loop.timeout = 0.0  # 零超时
 
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
         weave._event_bus = EventBus()
         weave._llm = AsyncMock()
         weave._memory = MagicMock()
@@ -1221,17 +1221,17 @@ class TestScheduledLoopImportFix:
     def test_scheduled_loop_imports_format_memory_context(self):
         """scheduled.py 应从 weave.loop.base 导入 format_memory_context。"""
         import inspect
-        from weave.loop import scheduled
+        from weave_agent_sdk.loop import scheduled
 
         source = inspect.getsource(scheduled)
         # 应导入 format_memory_context
-        assert "from weave.loop.base import" in source
+        assert "from weave_agent_sdk.loop.base import" in source
         assert "format_memory_context" in source
 
     def test_scheduled_loop_no_iterative_format_memory_import(self):
         """scheduled.py 不应从 weave.loop.iterative 导入 _format_memory。"""
         import inspect
-        from weave.loop import scheduled
+        from weave_agent_sdk.loop import scheduled
 
         source = inspect.getsource(scheduled)
         # 不应导入 _format_memory
@@ -1240,7 +1240,7 @@ class TestScheduledLoopImportFix:
     def test_scheduled_loop_calls_format_memory_context(self):
         """scheduled.py 的 _execute_once 方法应调用 format_memory_context 而非 _format_memory。"""
         import inspect
-        from weave.loop import scheduled
+        from weave_agent_sdk.loop import scheduled
 
         source = inspect.getsource(scheduled)
         # 方法体中使用 format_memory_context
@@ -1249,21 +1249,21 @@ class TestScheduledLoopImportFix:
         assert "_format_memory(memory_ctx)" not in source
 
     def test_scheduled_loop_no_method_body_import_message(self):
-        """scheduled.py 中 from weave.types import Message 应在文件顶部，而非方法体内部。"""
+        """scheduled.py 中 from weave_agent_sdk.types import Message 应在文件顶部，而非方法体内部。"""
         import inspect
-        from weave.loop import scheduled
+        from weave_agent_sdk.loop import scheduled
 
         source = inspect.getsource(scheduled)
         # 检查 Message 导入在文件顶部（import 段），而非方法体内部
         # 方法体中的 import 行会有缩进，文件顶部的 import 没有缩进
         lines = source.split("\n")
         for line in lines:
-            if "from weave.types import" in line and "Message" in line:
+            if "from weave_agent_sdk.types import" in line and "Message" in line:
                 # 文件顶部的导入不应有缩进
                 assert not line.startswith(" "), f"Import should be at file top, not indented: {line}"
                 break
         else:
-            pytest.fail("Could not find 'from weave.types import ... Message' in scheduled.py")
+            pytest.fail("Could not find 'from weave_agent_sdk.types import ... Message' in scheduled.py")
 
 
 # ============================================================
@@ -1277,7 +1277,7 @@ class TestScheduledLoopDeadCodeRemoved:
     def test_scheduled_loop_no_iterative_loop_import(self):
         """scheduled.py 不应导入 IterativeLoop（已移除死代码后不再需要）。"""
         import inspect
-        from weave.loop import scheduled
+        from weave_agent_sdk.loop import scheduled
 
         source = inspect.getsource(scheduled)
         assert "IterativeLoop" not in source
@@ -1285,9 +1285,9 @@ class TestScheduledLoopDeadCodeRemoved:
     def test_scheduled_loop_no_inner_iterative_loop(self):
         """scheduled.py 的 _execute_once 方法中不应包含 inner = IterativeLoop()。"""
         import inspect
-        from weave.loop import scheduled
+        from weave_agent_sdk.loop import scheduled
 
-        from weave.loop.scheduled import ScheduledLoop; source = inspect.getsource(ScheduledLoop._execute_once)
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop; source = inspect.getsource(ScheduledLoop._execute_once)
         assert "inner = IterativeLoop()" not in source
         assert "inner = " not in source
 
@@ -1295,8 +1295,8 @@ class TestScheduledLoopDeadCodeRemoved:
         """移除 IterativeLoop 导入和死代码后，模块应仍可正常导入。"""
         # 重新导入验证模块可正常加载
         import importlib
-        import weave.loop.scheduled
-        importlib.reload(weave.loop.scheduled)
+        import weave_agent_sdk.loop.scheduled
+        importlib.reload(weave_agent_sdk.loop.scheduled)
         # 不应抛出 ImportError
         assert True
 
@@ -1312,7 +1312,7 @@ class TestIterativeLoopStubFix:
     def test_stream_writes_initialized_as_empty_dict(self):
         """stream_writes 应初始化为空 dict，不再被零值填充。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # stream_writes 初始化为空 dict
@@ -1323,7 +1323,7 @@ class TestIterativeLoopStubFix:
     def test_state_writes_initialized_as_empty_dict(self):
         """state_writes 应初始化为空 dict，不再被零值填充。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # state_writes 初始化为空 dict
@@ -1334,7 +1334,7 @@ class TestIterativeLoopStubFix:
     def test_stream_writes_not_in_memory_updated_when_empty(self):
         """memory_updated 在 stream_writes 为空时不包含 'stream' 键。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # 应有条件判断：if stream_writes: memory_updated["stream"] = stream_writes
@@ -1344,7 +1344,7 @@ class TestIterativeLoopStubFix:
     def test_state_writes_not_in_memory_updated_when_empty(self):
         """memory_updated 在 state_writes 为空时不包含 'state' 键。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # 应有条件判断：if state_writes: memory_updated["state"] = state_writes
@@ -1354,7 +1354,7 @@ class TestIterativeLoopStubFix:
     def test_todo_comment_exists(self):
         """应存在 TODO 注释说明 stream/state 写入追踪需在 after_think 钩子中实现。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         assert "TODO" in source
@@ -1363,7 +1363,7 @@ class TestIterativeLoopStubFix:
     def test_tool_writes_still_tracked(self):
         """tool_writes 应继续被正确追踪（不受 stream/state 存根修复影响）。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # tool_writes 仍应按名称累计计数
@@ -1381,13 +1381,13 @@ class TestScheduledLoopInstantiationE2E:
     def test_scheduled_loop_can_be_imported(self):
         """ScheduledLoop 应可正常导入，无 ImportError。"""
         try:
-            from weave.loop.scheduled import ScheduledLoop
+            from weave_agent_sdk.loop.scheduled import ScheduledLoop
         except ImportError as e:
             pytest.fail(f"ScheduledLoop import failed: {e}")
 
     def test_scheduled_loop_can_be_instantiated(self):
         """ScheduledLoop 应可正常实例化。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
         loop = ScheduledLoop()
         assert type(loop).__name__ == "ScheduledLoop"
         assert loop._shutting_down is False
@@ -1395,7 +1395,7 @@ class TestScheduledLoopInstantiationE2E:
 
     def test_scheduled_loop_has_required_methods(self):
         """ScheduledLoop 应包含必需的公开方法。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
         loop = ScheduledLoop()
         assert hasattr(loop, "run")
         assert hasattr(loop, "handle_shutdown")
@@ -1404,7 +1404,7 @@ class TestScheduledLoopInstantiationE2E:
 
     def test_scheduled_loop_has_format_memory_context_available(self):
         """ScheduledLoop 模块中 format_memory_context 应可被调用。"""
-        from weave.loop.base import format_memory_context
+        from weave_agent_sdk.loop.base import format_memory_context
         # 测试 format_memory_context 函数正常工作
         ctx = {"stream": [{"role": "user", "content": "hello"}], "state": {"key": "val"}}
         result = format_memory_context(ctx)
@@ -1439,7 +1439,7 @@ class TestIterativeLoopMemoryUpdatedE2E:
         agent._config.llm.temperature = 0.0
 
         # Mock LLM 返回无 tool_calls 的响应（触发 no_tool_calls 停止）
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         agent._llm = AsyncMock()
         agent._llm.chat = AsyncMock(return_value=LLMResponse(
             content="Direct response",
@@ -1447,11 +1447,11 @@ class TestIterativeLoopMemoryUpdatedE2E:
         ))
 
         # Mock before_think 返回空 context（无 memory）
-        from weave.loop.base import BaseLoop
+        from weave_agent_sdk.loop.base import BaseLoop
         agent._system_prompt = "You are a test assistant."
 
         # 创建 IterativeLoop 实例
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
         loop = IterativeLoop()
 
         # Mock on_start / on_end
@@ -1491,8 +1491,8 @@ class TestIterativeLoopMemoryUpdatedE2E:
         agent._tool_map = {"test_tool": test_tool}
 
         # Mock LLM: 第一次返回 tool_call，第二次返回无 tool_calls
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent._llm = AsyncMock()
         agent._llm.chat = AsyncMock(side_effect=[
@@ -1512,7 +1512,7 @@ class TestIterativeLoopMemoryUpdatedE2E:
 
         agent._system_prompt = "You are a test assistant."
 
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
         loop = IterativeLoop()
 
         loop.on_start = AsyncMock()
@@ -1612,7 +1612,7 @@ class TestCreateLoopScheduledSupport:
 
     def test_agent_imports_scheduled_loop(self):
         """验证 loop 注册表包含 ScheduledLoop（内置策略 = 预注册默认值）。"""
-        from weave.loop.factory import LOOP_REGISTRY
+        from weave_agent_sdk.loop.factory import LOOP_REGISTRY
 
         assert "scheduled" in LOOP_REGISTRY.names()
         assert LOOP_REGISTRY.get("scheduled").__name__ == "ScheduledLoop"
@@ -1648,7 +1648,7 @@ class TestChatStreamToolsSupport:
     def test_chat_stream_passes_tools_to_stream(self):
         """验证 chat_stream() 将 tools 参数传递给 client.messages.stream。"""
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
 
         source = inspect.getsource(AnthropicAdapter.chat_stream)
         # tools 参数应传递给 stream 调用
@@ -1657,7 +1657,7 @@ class TestChatStreamToolsSupport:
     def test_chat_stream_has_tools_parameter_in_signature(self):
         """验证 chat_stream() 方法签名包含 tools 参数。"""
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
 
         sig = inspect.signature(AnthropicAdapter.chat_stream)
         assert "tools" in sig.parameters
@@ -1665,7 +1665,7 @@ class TestChatStreamToolsSupport:
     def test_chat_stream_handles_tool_messages(self):
         """验证 chat_stream() 正确处理 tool 角色消息（转为 tool_result content block）。"""
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
 
         source = inspect.getsource(AnthropicAdapter.chat_stream)
         # 应处理 role == "tool" 的消息
@@ -1676,7 +1676,7 @@ class TestChatStreamToolsSupport:
     def test_chat_stream_handles_assistant_with_tool_calls(self):
         """验证 chat_stream() 正确处理 assistant 消息中的 tool_calls。"""
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
 
         source = inspect.getsource(AnthropicAdapter.chat_stream)
         # assistant 消息包含 tool_calls 时，应构建 tool_use content blocks
@@ -1687,7 +1687,7 @@ class TestChatStreamToolsSupport:
     def test_chat_stream_converts_tools_to_anthropic(self):
         """验证 chat_stream() 调用了 _convert_tools_to_anthropic。"""
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
 
         source = inspect.getsource(AnthropicAdapter.chat_stream)
         # 应调用 _convert_tools_to_anthropic(tools)
@@ -1699,7 +1699,7 @@ class TestChatStreamToolsSupport:
         两者应使用相同的 system / tool / user / assistant 四种角色处理方式。
         """
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
 
         chat_source = inspect.getsource(AnthropicAdapter.chat)
         stream_source = inspect.getsource(AnthropicAdapter.chat_stream)
@@ -1724,7 +1724,7 @@ class TestChatStreamToolsSupport:
 
     def test_convert_tools_to_anthropic_function(self):
         """验证 _convert_tools_to_anthropic() 函数正确转换 tool schema。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         tools = [
             {
@@ -1745,7 +1745,7 @@ class TestChatStreamToolsSupport:
 
     def test_convert_tools_to_anthropic_openai_format(self):
         """验证 _convert_tools_to_anthropic() 能处理 OpenAI function-calling 格式（含 function 包装）。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         tools = [
             {
@@ -1769,14 +1769,14 @@ class TestChatStreamToolsSupport:
 
     def test_convert_tools_to_anthropic_empty_list(self):
         """验证 _convert_tools_to_anthropic() 处理空工具列表返回空列表。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         result = _convert_tools_to_anthropic([])
         assert result == []
 
     def test_convert_tools_to_anthropic_missing_fields(self):
         """验证 _convert_tools_to_anthropic() 处理缺少字段的 tool schema 不崩溃。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         tools = [
             {"name": "minimal_tool"},  # 只有 name，缺少 description 和 parameters
@@ -1803,7 +1803,7 @@ class TestStreamLastMultiBackend:
     def test_stream_last_returns_created_at_field(self):
         """stream_last() 应返回 _created_at 内部字段用于跨 backend 排序。"""
         import inspect
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         source = inspect.getsource(SQLiteBackend.stream_last)
         # 应返回 _created_at 字段
@@ -1812,7 +1812,7 @@ class TestStreamLastMultiBackend:
     def test_stream_last_query_returns_content_and_created_at(self):
         """验证 stream_last() 的 SQL 查询同时返回 content 和 created_at。"""
         import inspect
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         source = inspect.getsource(SQLiteBackend.stream_last)
         # SQL 查询应包含 created_at
@@ -1821,7 +1821,7 @@ class TestStreamLastMultiBackend:
     def test_stream_last_sorts_by_created_at_desc(self):
         """验证 stream_last() 按 created_at DESC 排序取最新 n 条。"""
         import inspect
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         source = inspect.getsource(SQLiteBackend.stream_last)
         assert "ORDER BY created_at DESC" in source
@@ -1829,7 +1829,7 @@ class TestStreamLastMultiBackend:
     def test_stream_last_returns_list(self):
         """stream_last() 应返回列表。"""
         import inspect
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         source = inspect.getsource(SQLiteBackend.stream_last)
         assert "return" in source
@@ -1837,7 +1837,7 @@ class TestStreamLastMultiBackend:
     def test_last_merges_all_backends_when_namespaces_none(self):
         """验证 last(namespaces=None) 遍历所有 backend 收集结果并合并。"""
         import inspect
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         source = inspect.getsource(SQLiteStreamMemory.last)
         # 应遍历所有 backend
@@ -1846,7 +1846,7 @@ class TestStreamLastMultiBackend:
     def test_last_cleans_created_at_internal_field(self):
         """验证 last() 在返回前清理了 _created_at 内部字段。"""
         import inspect
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         source = inspect.getsource(SQLiteStreamMemory.last)
         assert 'pop("_created_at"' in source
@@ -1854,7 +1854,7 @@ class TestStreamLastMultiBackend:
     def test_last_handles_empty_results(self):
         """验证 last() 在所有 backend 无结果时返回空列表。"""
         import inspect
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         source = inspect.getsource(SQLiteStreamMemory.last)
         # 应该有空结果检查
@@ -1863,7 +1863,7 @@ class TestStreamLastMultiBackend:
     def test_last_with_specific_namespaces_single_backend_optimization(self):
         """验证 last() 在指定 namespaces 且仅一个 backend 时走快速路径。"""
         import inspect
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         source = inspect.getsource(SQLiteStreamMemory.last)
         # 应有单 backend 优化路径
@@ -1941,7 +1941,7 @@ class TestStreamLastMultiBackendE2E:
     @pytest.fixture
     def multi_backend_setup(self, tmp_path):
         """创建两个独立的 SQLiteBackend 实例，各自写入不同 namespace 的数据。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         # 创建两个 backend，指向不同的 db 文件
         db1_path = tmp_path / "db1" / "memory.db"
@@ -1967,7 +1967,7 @@ class TestStreamLastMultiBackendE2E:
     @pytest.fixture
     def three_backend_setup(self, tmp_path):
         """创建三个独立的 SQLiteBackend 实例，验证三路合并。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         backends = []
         for idx in range(3):
@@ -1985,7 +1985,7 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_merges_two_backends(self, multi_backend_setup):
         """验证 last() 在多个 backend 时正确合并所有结果。"""
         backend1, backend2 = multi_backend_setup
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         # 创建 mock manager，包含两个 backend
         manager = MagicMock()
@@ -2022,7 +2022,7 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_limits_results_correctly(self, multi_backend_setup):
         """验证 last(n) 正确限制返回条数。"""
         backend1, backend2 = multi_backend_setup
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         manager = MagicMock()
         manager._backends = {
@@ -2048,7 +2048,7 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_with_specific_namespace(self, multi_backend_setup):
         """验证 last(namespaces=[...]) 只返回指定 namespace 的数据。"""
         backend1, backend2 = multi_backend_setup
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         # 需要 mock _backend 方法
         manager = MagicMock()
@@ -2081,8 +2081,8 @@ class TestStreamLastMultiBackendE2E:
 
     def test_stream_last_empty_backend_returns_empty(self):
         """验证 last() 在所有 backend 为空时返回空列表。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         backend = SQLiteBackend(":memory:")
         manager = MagicMock()
@@ -2098,7 +2098,7 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_merges_three_backends(self, three_backend_setup):
         """验证 last() 在三个 backend 时正确合并所有结果（多于2个的场景）。"""
         backend0, backend1, backend2 = three_backend_setup
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         manager = MagicMock()
         manager._backends = {
@@ -2128,7 +2128,7 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_with_duplicate_namespaces_in_list(self, multi_backend_setup):
         """验证 last() 在 namespaces 列表包含重复项时不会导致重复结果。"""
         backend1, backend2 = multi_backend_setup
-        from weave.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
 
         manager = MagicMock()
         manager._backends = {
@@ -2172,7 +2172,7 @@ class TestOpenAIChatStreamTools:
     def test_openai_chat_stream_passes_tools_to_stream(self):
         """验证 openai.py chat_stream() 将 tools 参数传递给 client.chat.completions.create。"""
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         source = inspect.getsource(OpenAIAdapter.chat_stream)
         # tools 参数应传递给 create 调用
@@ -2181,7 +2181,7 @@ class TestOpenAIChatStreamTools:
     def test_openai_chat_stream_has_tools_parameter_in_signature(self):
         """验证 openai.py chat_stream() 方法签名包含 tools 参数。"""
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         sig = inspect.signature(OpenAIAdapter.chat_stream)
         assert "tools" in sig.parameters
@@ -2189,7 +2189,7 @@ class TestOpenAIChatStreamTools:
     def test_openai_chat_stream_handles_tool_messages(self):
         """验证 openai.py chat_stream() 正确处理 tool 角色消息。"""
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         source = inspect.getsource(OpenAIAdapter.chat_stream)
         # 应处理 role == "tool" 的消息
@@ -2199,7 +2199,7 @@ class TestOpenAIChatStreamTools:
     def test_openai_chat_stream_handles_assistant_with_tool_calls(self):
         """验证 openai.py chat_stream() 正确处理 assistant 消息中的 tool_calls。"""
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         source = inspect.getsource(OpenAIAdapter.chat_stream)
         # assistant 消息包含 tool_calls 时，应构建 tool_calls 结构
@@ -2213,7 +2213,7 @@ class TestOpenAIChatStreamTools:
         两者应使用相同的 role 处理和 tool_calls / tool 消息格式。
         """
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         chat_source = inspect.getsource(OpenAIAdapter.chat)
         stream_source = inspect.getsource(OpenAIAdapter.chat_stream)
@@ -2237,7 +2237,7 @@ class TestOpenAIChatStreamTools:
     def test_openai_chat_stream_converts_tools_to_openai(self):
         """验证 openai.py chat_stream() 调用了 _convert_tools_to_openai。"""
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         source = inspect.getsource(OpenAIAdapter.chat_stream)
         # 应调用 _convert_tools_to_openai(tools)
@@ -2246,7 +2246,7 @@ class TestOpenAIChatStreamTools:
     def test_openai_chat_stream_tool_schemas_not_none_when_tools_given(self):
         """验证 openai.py chat_stream() 在 tools 参数不为空时 tool_schemas 不为 None。"""
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         source = inspect.getsource(OpenAIAdapter.chat_stream)
         # 应有条件判断：if tools: tool_schemas = _convert_tools_to_openai(tools)
@@ -2268,7 +2268,7 @@ class TestOpenAIImportJsonFix:
     def test_openai_py_has_module_level_import_json(self):
         """验证 openai.py 在文件顶部有 import json（而非 __import__("json")）。"""
         import inspect
-        from weave.llm import openai
+        from weave_agent_sdk.llm import openai
 
         source = inspect.getsource(openai)
         # 文件顶部应有 import json（无缩进）
@@ -2280,7 +2280,7 @@ class TestOpenAIImportJsonFix:
     def test_openai_py_no_dynamic_import_json(self):
         """验证 openai.py 中不存在 __import__("json") 动态导入。"""
         import inspect
-        from weave.llm import openai
+        from weave_agent_sdk.llm import openai
 
         source = inspect.getsource(openai)
         # 不应有 __import__("json")
@@ -2290,7 +2290,7 @@ class TestOpenAIImportJsonFix:
     def test_openai_py_chat_uses_json_dumps(self):
         """验证 openai.py chat() 使用 json.dumps 而非 __import__("json").dumps。"""
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         source = inspect.getsource(OpenAIAdapter.chat)
         # 使用 json.dumps
@@ -2301,7 +2301,7 @@ class TestOpenAIImportJsonFix:
     def test_openai_py_chat_stream_uses_json_dumps(self):
         """验证 openai.py chat_stream() 使用 json.dumps 而非 __import__("json").dumps。"""
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         source = inspect.getsource(OpenAIAdapter.chat_stream)
         # 使用 json.dumps
@@ -2312,7 +2312,7 @@ class TestOpenAIImportJsonFix:
     def test_openai_py_parse_response_uses_json_loads(self):
         """验证 openai.py _parse_openai_response() 使用 json.loads 而非 __import__("json").loads。"""
         import inspect
-        from weave.llm.openai import _parse_openai_response
+        from weave_agent_sdk.llm.openai import _parse_openai_response
 
         source = inspect.getsource(_parse_openai_response)
         # 使用 json.loads
@@ -2323,7 +2323,7 @@ class TestOpenAIImportJsonFix:
     def test_openai_py_no_import_json_in_function_body(self):
         """验证 openai.py 中所有 json 调用都在模块级 import 之后，无函数体内动态导入。"""
         import inspect
-        from weave.llm import openai
+        from weave_agent_sdk.llm import openai
 
         source = inspect.getsource(openai)
         # 检查所有 json 调用是否都使用模块级 json
@@ -2345,7 +2345,7 @@ class TestConvertToolsToAnthropicTypeFix:
 
     def test_function_field_not_dict_flat_fallback(self):
         """function 字段存在但不是 dict 类型时，应回退到扁平格式（取顶层字段）。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         # function 字段是字符串（异常情况）
         tools = [
@@ -2367,7 +2367,7 @@ class TestConvertToolsToAnthropicTypeFix:
 
     def test_function_field_is_integer(self):
         """function 字段是整数时，应回退到扁平格式而不崩溃。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         tools = [
             {
@@ -2383,7 +2383,7 @@ class TestConvertToolsToAnthropicTypeFix:
 
     def test_function_field_is_list(self):
         """function 字段是列表时，应回退到扁平格式而不崩溃。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         tools = [
             {
@@ -2400,7 +2400,7 @@ class TestConvertToolsToAnthropicTypeFix:
 
     def test_function_field_none(self):
         """function 字段是 None 时，应回退到扁平格式而不崩溃。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         tools = [
             {
@@ -2415,7 +2415,7 @@ class TestConvertToolsToAnthropicTypeFix:
 
     def test_function_field_valid_dict_still_works(self):
         """function 字段是有效 dict 时，仍按 OpenAI 包裹格式处理（回归验证）。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         tools = [
             {
@@ -2439,7 +2439,7 @@ class TestConvertToolsToAnthropicTypeFix:
 
     def test_flat_format_still_works(self):
         """扁平格式（无 function 字段）仍正常工作（回归验证）。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         tools = [
             {
@@ -2460,7 +2460,7 @@ class TestConvertToolsToAnthropicTypeFix:
 
     def test_function_field_missing_name_fallback(self):
         """function 字段不存在时，从顶层取 name（扁平格式），同时 function 非 dict 也不崩溃。"""
-        from weave.llm.anthropic import _convert_tools_to_anthropic
+        from weave_agent_sdk.llm.anthropic import _convert_tools_to_anthropic
 
         tools = [
             {
@@ -2489,7 +2489,7 @@ class TestIterativeLoopMemoryUpdatedSchema:
     def test_memory_updated_uses_tools_key(self):
         """验证 iterative.py 使用 "tools" 键而非 "tool" 键。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # 应使用 "tools" 键
@@ -2500,7 +2500,7 @@ class TestIterativeLoopMemoryUpdatedSchema:
     def test_memory_updated_tools_docstring(self):
         """验证 tool_writes 的 docstring 说明 {tool_name: call_count} 结构。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # 应包含注释说明 tools 字段结构
@@ -2510,7 +2510,7 @@ class TestIterativeLoopMemoryUpdatedSchema:
     def test_tools_key_added_only_when_tool_writes_non_empty(self):
         """验证 "tools" 键仅在 tool_writes 非空时添加到 memory_updated。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # 应有条件判断：if tool_writes: memory_updated["tools"] = tool_writes
@@ -2520,7 +2520,7 @@ class TestIterativeLoopMemoryUpdatedSchema:
     def test_tool_key_not_present_anywhere(self):
         """验证整个 iterative.py 中不存在 'tool' 单数作为 memory_updated 的键。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative)
         # 检查 memory_updated 相关代码
@@ -2533,7 +2533,7 @@ class TestIterativeLoopMemoryUpdatedSchema:
     def test_tools_key_in_result_matches_fix_record(self):
         """验证 fix_record.md 中描述的 schema 一致：tools 为 {tool_name: call_count}。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # tool_writes 结构注释应说明 {tool_name: call_count}
@@ -2554,8 +2554,8 @@ class TestOpenAIChatStreamToolsE2E:
 
     def test_openai_chat_stream_tool_message_building(self):
         """验证 openai.py chat_stream() 构建 tool 消息的消息格式正确。"""
-        from weave.llm.openai import OpenAIAdapter
-        from weave.types import Message, ToolCall
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.types import Message, ToolCall
 
         adapter = OpenAIAdapter(api_key="test-key", model="test-model")
 
@@ -2610,7 +2610,7 @@ class TestOpenAIChatStreamToolsE2E:
 
     def test_openai_chat_stream_tool_schema_conversion(self):
         """验证 _convert_tools_to_openai() 正确转换为 OpenAI 格式。"""
-        from weave.llm.openai import _convert_tools_to_openai
+        from weave_agent_sdk.llm.openai import _convert_tools_to_openai
 
         tools = [
             {
@@ -2633,7 +2633,7 @@ class TestOpenAIChatStreamToolsE2E:
 
     def test_openai_chat_stream_tool_schema_openai_format_passthrough(self):
         """验证已遵循 OpenAI 格式的 tool schema 被直接传递。"""
-        from weave.llm.openai import _convert_tools_to_openai
+        from weave_agent_sdk.llm.openai import _convert_tools_to_openai
 
         tools = [
             {
@@ -2657,14 +2657,14 @@ class TestOpenAIChatStreamToolsE2E:
 
     def test_openai_chat_stream_empty_tools_no_error(self):
         """验证 tools 为空列表时不会出错。"""
-        from weave.llm.openai import _convert_tools_to_openai
+        from weave_agent_sdk.llm.openai import _convert_tools_to_openai
 
         result = _convert_tools_to_openai([])
         assert result == []
 
     def test_openai_convert_tools_to_openai_supports_input_schema(self):
         """验证 _convert_tools_to_openai 支持 input_schema 作为 parameters 的回退。"""
-        from weave.llm.openai import _convert_tools_to_openai
+        from weave_agent_sdk.llm.openai import _convert_tools_to_openai
 
         tools = [
             {
@@ -2709,8 +2709,8 @@ class TestIterativeLoopMemoryUpdatedSchemaE2E:
         agent._tools = [test_tool]
         agent._tool_map = {"test_tool": test_tool}
 
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent._llm = AsyncMock()
         agent._llm.chat = AsyncMock(side_effect=[
@@ -2730,7 +2730,7 @@ class TestIterativeLoopMemoryUpdatedSchemaE2E:
 
         agent._system_prompt = "You are a test assistant."
 
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
         loop = IterativeLoop()
 
         loop.on_start = AsyncMock()
@@ -2759,7 +2759,7 @@ class TestIterativeLoopMemoryUpdatedSchemaE2E:
         agent._config.llm.max_tokens = 100
         agent._config.llm.temperature = 0.0
 
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         agent._llm = AsyncMock()
         agent._llm.chat = AsyncMock(return_value=LLMResponse(
             content="Direct response",
@@ -2770,7 +2770,7 @@ class TestIterativeLoopMemoryUpdatedSchemaE2E:
         agent._tools = []
         agent._tool_map = {}
 
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
         loop = IterativeLoop()
 
         loop.on_start = AsyncMock()
@@ -2788,7 +2788,7 @@ class TestIterativeLoopMemoryUpdatedSchemaE2E:
     async def test_memory_updated_tools_key_not_tool_in_fix_record(self):
         """验证 fix_record.md 中描述的修复项23被正确实现。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # 确认代码中使用 "tools" 而非 "tool"
@@ -2799,7 +2799,7 @@ class TestIterativeLoopMemoryUpdatedSchemaE2E:
     async def test_memory_updated_schema_consistency(self):
         """验证 memory_updated 的 schema 一致性：stream/state 为 namespace 粒度，tools 为 tool_name 粒度。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative.IterativeLoop.run)
         # stream 和 state 使用 namespace 粒度
@@ -2817,21 +2817,21 @@ class TestIterativeLoopMemoryUpdatedSchemaE2E:
 class TestAnthropicNoHardcodedSystemPrompt:
     def test_chat_no_hardcoded_fallback(self):
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
         source = inspect.getsource(AnthropicAdapter.chat)
         assert "system=system_prompt.strip()" in source
         assert "You are a helpful assistant" not in source
 
     def test_chat_stream_no_hardcoded_fallback(self):
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
         source = inspect.getsource(AnthropicAdapter.chat_stream)
         assert "system=system_prompt.strip()" in source
         assert "You are a helpful assistant" not in source
 
     def test_entire_anthropic_py_no_hardcoded_prompt(self):
         import inspect
-        from weave.llm import anthropic
+        from weave_agent_sdk.llm import anthropic
         source = inspect.getsource(anthropic)
         assert "You are a helpful" not in source
 
@@ -2839,7 +2839,7 @@ class TestAnthropicNoHardcodedSystemPrompt:
 class TestFactoryNoRedundantDefault:
     def test_deepseek_branch_no_redundant_default(self):
         import inspect
-        from weave.llm import factory
+        from weave_agent_sdk.llm import factory
         source = inspect.getsource(factory)
         assert 'model=model or "deepseek-chat"' not in source
         lines = source.split(chr(10))
@@ -2852,7 +2852,7 @@ class TestFactoryNoRedundantDefault:
                 break
 
     def test_default_model_returns_deepseek_chat(self):
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
         was = os.environ.pop("WEAVE_MODEL", None)
         was2 = os.environ.pop("DEEPSEEK_MODEL", None)
         try:
@@ -2866,7 +2866,7 @@ class TestFactoryNoRedundantDefault:
 
     def test_create_llm_deepseek_uses_model_parameter(self):
         import inspect
-        from weave.llm import factory
+        from weave_agent_sdk.llm import factory
         source = inspect.getsource(factory._make_deepseek)
         assert "model=model" in source
 
@@ -2874,19 +2874,19 @@ class TestFactoryNoRedundantDefault:
 class TestAnthropicSystemPromptE2E:
     def test_chat_passes_empty_system_prompt(self):
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
         source = inspect.getsource(AnthropicAdapter.chat)
         assert "system=system_prompt.strip()" in source
 
     def test_chat_stream_passes_empty_system_prompt(self):
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
         source = inspect.getsource(AnthropicAdapter.chat_stream)
         assert "system=system_prompt.strip()" in source
 
     def test_empty_system_prompt_no_fallback(self):
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
         chat_src = inspect.getsource(AnthropicAdapter.chat)
         stream_src = inspect.getsource(AnthropicAdapter.chat_stream)
         for src in [chat_src, stream_src]:
@@ -2900,7 +2900,7 @@ class TestAnthropicSystemPromptE2E:
 
 class TestFactoryDeepseekModelE2E:
     def test_create_llm_deepseek_model_from_default(self):
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
         was = os.environ.pop("WEAVE_MODEL", None)
         was2 = os.environ.pop("DEEPSEEK_MODEL", None)
         try:
@@ -2912,16 +2912,16 @@ class TestFactoryDeepseekModelE2E:
             if was2 is not None:
                 os.environ["DEEPSEEK_MODEL"] = was2
         import inspect
-        from weave.llm import factory
+        from weave_agent_sdk.llm import factory
         source = inspect.getsource(factory.create_llm)
         assert "model = _resolve_model(provider)" in source
 
     def test_create_llm_deepseek_explicit_model(self):
         from unittest.mock import patch
-        from weave.llm.factory import create_llm
-        with patch("weave.llm.openai.OpenAIAdapter") as mock_ad:
-            with patch("weave.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave.llm.factory.load_claude_env"):
+        from weave_agent_sdk.llm.factory import create_llm
+        with patch("weave_agent_sdk.llm.openai.OpenAIAdapter") as mock_ad:
+            with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
+                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
                     create_llm(provider="deepseek", model="custom-model")
                     mock_ad.assert_called_once()
                     _, kwargs = mock_ad.call_args
@@ -2929,14 +2929,14 @@ class TestFactoryDeepseekModelE2E:
 
     def test_create_llm_deepseek_default_model(self):
         from unittest.mock import patch
-        from weave.llm.factory import create_llm
+        from weave_agent_sdk.llm.factory import create_llm
         import os
         old_val = os.environ.get("DEEPSEEK_MODEL")
         os.environ["DEEPSEEK_MODEL"] = "deepseek-chat"
         try:
-            with patch("weave.llm.openai.OpenAIAdapter") as mock_ad:
-                with patch("weave.llm.factory._resolve_api_key", return_value="test-key"):
-                    with patch("weave.llm.factory.load_claude_env"):
+            with patch("weave_agent_sdk.llm.openai.OpenAIAdapter") as mock_ad:
+                with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
+                    with patch("weave_agent_sdk.llm.factory.load_claude_env"):
                         create_llm(provider="deepseek", model=None)
                         mock_ad.assert_called_once()
                         _, kwargs = mock_ad.call_args
@@ -2962,14 +2962,14 @@ class TestToolTimeout:
 
     def test_loop_config_has_tool_timeout_field(self):
         """LoopConfig 应包含 tool_timeout 字段，默认值 30.0。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
         config = LoopConfig()
         assert hasattr(config, "tool_timeout")
         assert config.tool_timeout == 30.0
 
     def test_loop_config_tool_timeout_customizable(self):
         """LoopConfig.tool_timeout 应可自定义。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
         config = LoopConfig(tool_timeout=60.0)
         assert config.tool_timeout == 60.0
 
@@ -3016,7 +3016,7 @@ class TestToolTimeout:
     def test_execute_tool_uses_tool_timeout_from_config(self):
         """验证 _execute_tool() 从 agent._config.loop.tool_timeout 读取超时值。"""
         import inspect
-        from weave.loop.iterative import _execute_tool
+        from weave_agent_sdk.loop.iterative import _execute_tool
 
         source = inspect.getsource(_execute_tool)
         # 应使用 tool_timeout 配置
@@ -3025,8 +3025,8 @@ class TestToolTimeout:
 
     def test_execute_tool_returns_timeout_error(self):
         """验证 _execute_tool() 在 tool 超时时返回带 TimeoutError 的 ToolResult。"""
-        from weave.types import ToolResult as ToolResultType, ToolCall
-        from weave.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolResult as ToolResultType, ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 0.001  # 极短超时确保触发
@@ -3046,8 +3046,8 @@ class TestToolTimeout:
 
     def test_execute_tool_returns_unknown_tool_error(self):
         """验证 _execute_tool() 在 tool 不存在时返回带错误信息的 ToolResult。"""
-        from weave.types import ToolCall
-        from weave.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
 
         agent = MagicMock()
         agent._tool_map = {}
@@ -3075,7 +3075,7 @@ class TestScheduledStateWriteExceptionHandling:
     def test_scheduled_state_write_has_file_not_found_handler(self):
         """scheduled.py 中 FileNotFoundError 应被静默处理（正常情况）。"""
         import inspect
-        from weave.loop import scheduled
+        from weave_agent_sdk.loop import scheduled
 
         source = inspect.getsource(scheduled)
         assert "FileNotFoundError" in source
@@ -3083,7 +3083,7 @@ class TestScheduledStateWriteExceptionHandling:
     def test_scheduled_state_write_has_generic_exception_logger(self):
         """scheduled.py 中兜底 Exception 应记录 logger.warning。"""
         import inspect
-        from weave.loop import scheduled
+        from weave_agent_sdk.loop import scheduled
 
         source = inspect.getsource(scheduled)
         assert 'logger.warning("Failed to save scheduled run state:' in source
@@ -3091,7 +3091,7 @@ class TestScheduledStateWriteExceptionHandling:
     def test_scheduled_state_write_no_silent_exception_pass(self):
         """scheduled.py 中不应有静默的 except Exception: pass。"""
         import inspect
-        from weave.loop import scheduled
+        from weave_agent_sdk.loop import scheduled
 
         source = inspect.getsource(scheduled)
         # 检查 _execute_once 方法体
@@ -3123,7 +3123,7 @@ class TestAccessTypeValidation:
     def test_get_backend_for_namespace_validates_access_type(self):
         """_get_backend_for_namespace() 对非法 access_type 应抛出 ValueError。"""
         import inspect
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         source = inspect.getsource(MemoryManager._get_backend_for_namespace)
         assert "_VALID_ACCESS_TYPES" in source
@@ -3133,7 +3133,7 @@ class TestAccessTypeValidation:
     def test_get_namespaces_validates_access_type(self):
         """get_namespaces() 对非法 access_type 应抛出 ValueError。"""
         import inspect
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         source = inspect.getsource(MemoryManager.get_namespaces)
         assert "_VALID_ACCESS_TYPES" in source
@@ -3142,7 +3142,7 @@ class TestAccessTypeValidation:
     def test_get_namespace_validates_access_type(self):
         """get_namespace() 对非法 access_type 应抛出 ValueError。"""
         import inspect
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         source = inspect.getsource(MemoryManager.get_namespace)
         assert "_VALID_ACCESS_TYPES" in source
@@ -3150,13 +3150,13 @@ class TestAccessTypeValidation:
 
     def test_valid_access_types_defined(self):
         """验证 _VALID_ACCESS_TYPES 包含 stream/state/knowledge。"""
-        from weave.memory.manager import _VALID_ACCESS_TYPES
+        from weave_agent_sdk.memory.manager import _VALID_ACCESS_TYPES
         assert _VALID_ACCESS_TYPES == frozenset({"stream", "state", "knowledge"})
 
     def test_invalid_access_type_raises_value_error_on_get_backend(self):
         """使用非法 access_type 的 namespace 调用 _get_backend_for_namespace 应抛出 ValueError。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig())
         # 非法 access_type
@@ -3167,8 +3167,8 @@ class TestAccessTypeValidation:
 
     def test_invalid_access_type_raises_value_error_on_get_namespaces(self):
         """get_namespaces() 传入非法 access_type 应抛出 ValueError。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig())
         with pytest.raises(ValueError) as excinfo:
@@ -3178,8 +3178,8 @@ class TestAccessTypeValidation:
 
     def test_invalid_access_type_raises_value_error_on_get_namespace(self):
         """get_namespace() 传入非法 access_type 应抛出 ValueError。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig())
         with pytest.raises(ValueError) as excinfo:
@@ -3188,8 +3188,8 @@ class TestAccessTypeValidation:
 
     def test_valid_access_types_pass_through(self):
         """合法的 access_type（stream/state/knowledge）应正常通过。"""
-        from weave.memory.manager import MemoryManager, _VALID_ACCESS_TYPES
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager, _VALID_ACCESS_TYPES
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig())
 
@@ -3217,20 +3217,20 @@ class TestNoHardcodedModelNames:
 
     def test_llm_config_model_default_is_empty_string(self):
         """LLMConfig.model 默认值应为空字符串。"""
-        from weave.types import LLMConfig
+        from weave_agent_sdk.types import LLMConfig
         config = LLMConfig()
         assert config.model == "", "LLMConfig.model should default to empty string (R3)"
 
     def test_anthropic_adapter_raises_value_error_for_empty_model(self):
         """AnthropicAdapter 在 model 为空时应抛出 ValueError。"""
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
         with pytest.raises(ValueError) as excinfo:
             AnthropicAdapter(api_key="test-key", model="")
         assert "model must be specified" in str(excinfo.value).lower()
 
     def test_openai_adapter_raises_value_error_for_empty_model(self):
         """OpenAIAdapter 在 model 为空时应抛出 ValueError。"""
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
         with pytest.raises(ValueError) as excinfo:
             OpenAIAdapter(api_key="test-key", model="")
         assert "model must be specified" in str(excinfo.value).lower()
@@ -3238,7 +3238,7 @@ class TestNoHardcodedModelNames:
     def test_config_py_no_hardcoded_model_fallback(self):
         """config.py 中不应有硬编码模型名作为 fallback。"""
         import inspect
-        from weave import config
+        from weave_agent_sdk import config
 
         source = inspect.getsource(config.load_config)
         # 不应使用硬编码模型名作为 fallback
@@ -3248,7 +3248,7 @@ class TestNoHardcodedModelNames:
     def test_factory_py_no_default_model_function(self):
         """factory.py 中不应有 _default_model() 函数（返回硬编码映射）。"""
         import inspect
-        from weave.llm import factory
+        from weave_agent_sdk.llm import factory
 
         # _default_model 函数应不存在
         assert not hasattr(factory, '_default_model')
@@ -3256,7 +3256,7 @@ class TestNoHardcodedModelNames:
     def test_factory_py_has_resolve_model_function(self):
         """factory.py 应有 _resolve_model() 函数从环境变量读取模型名。"""
         import inspect
-        from weave.llm import factory
+        from weave_agent_sdk.llm import factory
 
         source = inspect.getsource(factory)
         assert "_resolve_model" in source
@@ -3264,14 +3264,14 @@ class TestNoHardcodedModelNames:
 
     def test_factory_create_llm_raises_value_error_for_empty_model(self, monkeypatch):
         """create_llm() 在模型名为空时应抛出 ValueError。"""
-        from weave.llm.factory import create_llm
+        from weave_agent_sdk.llm.factory import create_llm
 
         # 确保所有环境变量中都没有模型名
         monkeypatch.delenv("WEAVE_MODEL", raising=False)
         monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
 
-        with patch("weave.llm.factory._resolve_api_key", return_value="test-key"):
-            with patch("weave.llm.factory.load_claude_env"):
+        with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
+            with patch("weave_agent_sdk.llm.factory.load_claude_env"):
                 with pytest.raises(ValueError) as excinfo:
                     create_llm(provider="anthropic")
                 assert "model" in str(excinfo.value).lower()
@@ -3313,7 +3313,7 @@ class TestToolTimeoutConfigPropagationE2E:
     def test_execute_tool_timeout_in_iterative_py_source(self):
         """验证 iterative.py 中 _execute_tool 使用 asyncio.wait_for + tool_timeout。"""
         import inspect
-        from weave.loop import iterative
+        from weave_agent_sdk.loop import iterative
 
         source = inspect.getsource(iterative._execute_tool)
         # 核心验证：使用 asyncio.wait_for 包裹 tool 执行
@@ -3330,8 +3330,8 @@ class TestToolTimeoutConfigPropagationE2E:
     @pytest.mark.asyncio
     async def test_execute_tool_with_mocked_timeout_integration(self):
         """集成测试：通过 mock agent 验证 _execute_tool 超时路径完整可用。"""
-        from weave.types import ToolResult as ToolResultType, ToolCall
-        from weave.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolResult as ToolResultType, ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 0.001  # 极短超时
@@ -3366,7 +3366,7 @@ class TestR3NoHardcodedModelE2E:
     def test_no_hardcoded_model_in_types_py(self):
         """types.py 中 LLMConfig 不应包含硬编码模型名。"""
         import inspect
-        from weave.types import LLMConfig
+        from weave_agent_sdk.types import LLMConfig
 
         source = inspect.getsource(LLMConfig)
         # 模型名默认值应为空字符串
@@ -3379,7 +3379,7 @@ class TestR3NoHardcodedModelE2E:
     def test_no_hardcoded_model_in_anthropic_py(self):
         """anthropic.py 的 __init__ 中模型名默认值应为空字符串。"""
         import inspect
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
 
         source = inspect.getsource(AnthropicAdapter.__init__)
         assert 'model: str = ""' in source
@@ -3387,7 +3387,7 @@ class TestR3NoHardcodedModelE2E:
     def test_no_hardcoded_model_in_openai_py(self):
         """openai.py 的 __init__ 中模型名默认值应为空字符串。"""
         import inspect
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         source = inspect.getsource(OpenAIAdapter.__init__)
         assert 'model: str = ""' in source
@@ -3395,7 +3395,7 @@ class TestR3NoHardcodedModelE2E:
     def test_no_hardcoded_model_in_config_py(self):
         """config.py 中不应有硬编码模型名 fallback。"""
         import inspect
-        from weave import config
+        from weave_agent_sdk import config
 
         source = inspect.getsource(config)
         # 不应包含任何硬编码模型名
@@ -3407,7 +3407,7 @@ class TestR3NoHardcodedModelE2E:
     def test_no_hardcoded_model_in_factory_py(self):
         """factory.py 中模型名从 WEAVE_MODEL 环境变量读取。"""
         import inspect
-        from weave.llm import factory
+        from weave_agent_sdk.llm import factory
 
         source = inspect.getsource(factory)
         # 使用 _resolve_model 从环境变量读取
@@ -3433,8 +3433,8 @@ class TestToolTimeoutSyncFunction:
     @pytest.mark.asyncio
     async def test_execute_tool_sync_function_timeout(self):
         """同步阻塞 tool 应触发 TimeoutError。"""
-        from weave.types import ToolCall
-        from weave.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 0.001  # 极短超时确保触发
@@ -3458,8 +3458,8 @@ class TestToolTimeoutSyncFunction:
     @pytest.mark.asyncio
     async def test_execute_tool_sync_function_normal_completion(self):
         """同步非阻塞 tool 应正常返回结果（超时保护不误伤）。"""
-        from weave.types import ToolCall
-        from weave.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 5.0  # 足够超时
@@ -3478,8 +3478,8 @@ class TestToolTimeoutSyncFunction:
     @pytest.mark.asyncio
     async def test_execute_tool_async_function_normal_completion(self):
         """异步非阻塞 tool 应正常返回结果。"""
-        from weave.types import ToolCall
-        from weave.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 5.0  # 足够超时
@@ -3504,7 +3504,7 @@ class TestResolveModelEnvVar:
 
     def test_resolve_model_from_weave_model_env(self, monkeypatch):
         """_resolve_model() 应从 WEAVE_MODEL 环境变量读取模型名。"""
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
 
         monkeypatch.setenv("WEAVE_MODEL", "claude-opus-4-20251001")
         result = _resolve_model("anthropic")
@@ -3512,7 +3512,7 @@ class TestResolveModelEnvVar:
 
     def test_resolve_model_from_provider_specific_env(self, monkeypatch):
         """_resolve_model() 应从 provider 专用环境变量读取模型名。"""
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
 
         # WEAVE_MODEL 未设置时降级到 ANTHROPIC_MODEL
         monkeypatch.delenv("WEAVE_MODEL", raising=False)
@@ -3522,7 +3522,7 @@ class TestResolveModelEnvVar:
 
     def test_resolve_model_prefers_weave_model_over_provider_specific(self, monkeypatch):
         """_resolve_model() 应优先使用 WEAVE_MODEL 而非 provider 专用变量。"""
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
 
         monkeypatch.setenv("WEAVE_MODEL", "claude-opus-4-20251001")
         monkeypatch.setenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307")
@@ -3532,7 +3532,7 @@ class TestResolveModelEnvVar:
 
     def test_resolve_model_returns_empty_when_no_env(self, monkeypatch):
         """_resolve_model() 在所有环境变量均未设置时返回空字符串。"""
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
 
         monkeypatch.delenv("WEAVE_MODEL", raising=False)
         monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
@@ -3541,7 +3541,7 @@ class TestResolveModelEnvVar:
 
     def test_resolve_model_openai_provider(self, monkeypatch):
         """_resolve_model() 对 openai provider 使用 OPENAI_MODEL 环境变量。"""
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
 
         monkeypatch.delenv("WEAVE_MODEL", raising=False)
         monkeypatch.setenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -3550,7 +3550,7 @@ class TestResolveModelEnvVar:
 
     def test_resolve_model_deepseek_provider(self, monkeypatch):
         """_resolve_model() 对 deepseek provider 使用 DEEPSEEK_MODEL 环境变量。"""
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
 
         monkeypatch.delenv("WEAVE_MODEL", raising=False)
         monkeypatch.setenv("DEEPSEEK_MODEL", "deepseek-chat-v2")
@@ -3567,7 +3567,7 @@ class TestScheduledStateWriteLoggerBehavior:
     @pytest.mark.asyncio
     async def test_scheduled_state_write_logs_warning_on_generic_error(self, caplog):
         """scheduled._execute_once 在 state.set() 抛出通用异常时应记录警告日志。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         # Mock agent
         agent = MagicMock()
@@ -3577,7 +3577,7 @@ class TestScheduledStateWriteLoggerBehavior:
         agent._config.llm.temperature = 0.0
 
         # Mock LLM
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         agent._llm = AsyncMock()
         agent._llm.chat = AsyncMock(return_value=LLMResponse(
             content="Scheduled response", model="test"
@@ -3612,7 +3612,7 @@ class TestScheduledStateWriteLoggerBehavior:
     @pytest.mark.asyncio
     async def test_scheduled_state_write_file_not_found_silent(self, caplog):
         """scheduled._execute_once 在 FileNotFoundError 时应静默通过，不记录日志。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -3620,7 +3620,7 @@ class TestScheduledStateWriteLoggerBehavior:
         agent._config.llm.max_tokens = 100
         agent._config.llm.temperature = 0.0
 
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         agent._llm = AsyncMock()
         agent._llm.chat = AsyncMock(return_value=LLMResponse(
             content="Scheduled response", model="test"
@@ -3666,8 +3666,8 @@ class TestToolTimeoutAdditional:
     @pytest.mark.asyncio
     async def test_execute_tool_non_numeric_timeout_falls_back_to_default(self):
         """tool_timeout 配置为非数值时，应回退默认 30.0 且 tool 正常执行。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = "not-a-number"  # 非数值配置
@@ -3686,8 +3686,8 @@ class TestToolTimeoutAdditional:
     @pytest.mark.asyncio
     async def test_execute_tool_generic_exception_returns_structured_error(self):
         """tool 抛出通用异常时，应返回带异常类型名和消息的结构化错误。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 5.0
@@ -3709,7 +3709,7 @@ class TestResolveModelAdditional:
 
     def test_resolve_model_unknown_provider_returns_empty(self, monkeypatch):
         """_resolve_model() 对未知 provider（无对应环境变量）应返回空字符串。"""
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
 
         monkeypatch.delenv("WEAVE_MODEL", raising=False)
         result = _resolve_model("unknown_provider")
@@ -3717,7 +3717,7 @@ class TestResolveModelAdditional:
 
     def test_anthropic_adapter_empty_model_error_mentions_config(self):
         """AnthropicAdapter 空模型错误信息应引导用户配置 weave.yaml / WEAVE_MODEL。"""
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
 
         with pytest.raises(ValueError) as excinfo:
             AnthropicAdapter(api_key="test-key", model="")
@@ -3759,8 +3759,8 @@ class TestScheduledStateWriteAdditional:
     @pytest.mark.asyncio
     async def test_scheduled_state_write_sets_last_run_fields(self):
         """_execute_once() 成功路径应写入 last_run_at 和 last_run_error 两个 state 键。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -3794,8 +3794,8 @@ class TestScheduledStateWriteAdditional:
     @pytest.mark.asyncio
     async def test_scheduled_state_write_default_namespace_when_no_scopes(self):
         """get_namespaces 返回空时，应使用默认 namespace 'default:session:state'。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -3826,8 +3826,8 @@ class TestAccessTypeAdditional:
 
     def test_get_backend_single_segment_namespace_defaults_stream(self):
         """单段 namespace（无 access_type）应默认 stream，正常返回后端不抛错。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
         backend = manager._get_backend_for_namespace("justscope")
@@ -3866,9 +3866,9 @@ class TestE2EToolTimeoutLoop:
     @pytest.mark.asyncio
     async def test_iterative_loop_tool_timeout_error_does_not_hang(self):
         """慢 tool 超时后循环应继续，最终输出正常返回且 tool 计数被记录。"""
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -3928,12 +3928,12 @@ class TestE2ECreateLLMFromEnv:
 
     def test_create_llm_uses_weave_model_env(self, monkeypatch):
         """create_llm(provider=..., model=None) 应使用 WEAVE_MODEL 环境变量作为模型名。"""
-        from weave.llm.factory import create_llm
+        from weave_agent_sdk.llm.factory import create_llm
 
         monkeypatch.setenv("WEAVE_MODEL", "claude-e2e-2026")
-        with patch("weave.llm.anthropic.AnthropicAdapter") as mock_ad:
-            with patch("weave.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave.llm.factory.load_claude_env"):
+        with patch("weave_agent_sdk.llm.anthropic.AnthropicAdapter") as mock_ad:
+            with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
+                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
                     create_llm(provider="anthropic", model=None)
                     mock_ad.assert_called_once()
                     _, kwargs = mock_ad.call_args
@@ -3945,8 +3945,8 @@ class TestE2EAccessTypeValidation:
 
     def test_memory_manager_access_type_end_to_end(self):
         """合法 access_type 正常返回 namespace；非法 access_type 抛 ValueError。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
         manager.activate_scopes({"default_id": "s1"})
@@ -3972,8 +3972,8 @@ class TestE2EToolTimeoutConfigPropagation:
     async def test_tool_timeout_config_end_to_end(self, tmp_path):
         """YAML 配置的 tool_timeout 应被 load_config 解析并用于 _execute_tool 超时保护。"""
         import yaml
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         yaml_path = tmp_path / "e2e_tool_timeout.yaml"
         config_data = {
@@ -4026,8 +4026,8 @@ class TestToolTimeoutWaitFor:
     @pytest.mark.asyncio
     async def test_execute_tool_passes_config_timeout_to_wait_for(self):
         """_execute_tool 应将配置的 tool_timeout 精确传给 asyncio.wait_for。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         captured = {}
 
@@ -4044,7 +4044,7 @@ class TestToolTimeoutWaitFor:
         agent._tool_map = {"fast_tool": fast_tool}
         tc = ToolCall(id="c1", name="fast_tool", arguments={"x": "hi"})
 
-        with patch("weave.loop.iterative.asyncio.wait_for", side_effect=fake_wait_for):
+        with patch("weave_agent_sdk.loop.iterative.asyncio.wait_for", side_effect=fake_wait_for):
             result = await _execute_tool(agent, tc)
 
         assert result.error is None
@@ -4054,8 +4054,8 @@ class TestToolTimeoutWaitFor:
     @pytest.mark.asyncio
     async def test_execute_tool_async_dict_result_preserved(self):
         """异步 tool 返回 dict 时，结果应原样保留在 ToolResult.result。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 5.0
@@ -4073,7 +4073,7 @@ class TestToolTimeoutWaitFor:
 
     def test_loop_config_timeout_and_tool_timeout_independent(self):
         """LoopConfig.timeout 与 tool_timeout 应相互独立、互不影响。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         config = LoopConfig(timeout=10.0, tool_timeout=20.0)
         assert config.timeout == 10.0
@@ -4090,8 +4090,8 @@ class TestScheduledStateWritePartialFailure:
     @pytest.mark.asyncio
     async def test_scheduled_state_write_first_succeeds_second_raises(self, caplog):
         """第一条 state 写入成功、第二条失败时，失败被记录日志且主流程正常。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4128,7 +4128,7 @@ class TestCreateLoopNoSilentFallback:
     def test_create_loop_source_has_no_silent_fallback(self):
         """_create_loop() 源码中不应存在 logger.warning 静默回退路径。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave._create_loop)
         # 不再静默回退：无 logger.warning 兜底
@@ -4143,8 +4143,8 @@ class TestAccessTypeResolution:
 
     def test_get_namespace_valid_scope_and_type(self):
         """合法 scope + access_type 应正确构造 namespace。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
         manager.activate_scopes({"default_id": "fixed-id"})
@@ -4155,8 +4155,8 @@ class TestAccessTypeResolution:
 
     def test_get_backend_for_namespace_respects_scope_path(self, tmp_path):
         """namespace 中的 access_type 应正确解析到 scope 配置的 db 路径。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         db = str(tmp_path / "custom" / "memory.db")
         scopes = {"custom": MemoryScopeConfig(
@@ -4198,13 +4198,13 @@ class TestR3ModelResolutionAdditional:
 
     def test_create_llm_openai_uses_provider_env_model(self, monkeypatch):
         """create_llm(provider='openai', model=None) 应使用 OPENAI_MODEL 环境变量。"""
-        from weave.llm.factory import create_llm
+        from weave_agent_sdk.llm.factory import create_llm
 
         monkeypatch.delenv("WEAVE_MODEL", raising=False)
         monkeypatch.setenv("OPENAI_MODEL", "gpt-e2e-2026")
-        with patch("weave.llm.openai.OpenAIAdapter") as mock_ad:
-            with patch("weave.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave.llm.factory.load_claude_env"):
+        with patch("weave_agent_sdk.llm.openai.OpenAIAdapter") as mock_ad:
+            with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
+                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
                     create_llm(provider="openai", model=None)
                     mock_ad.assert_called_once()
                     _, kwargs = mock_ad.call_args
@@ -4212,7 +4212,7 @@ class TestR3ModelResolutionAdditional:
 
     def test_anthropic_adapter_accepts_non_empty_model(self):
         """AnthropicAdapter 在传入非空 model 时应正常实例化并保存模型名。"""
-        from weave.llm.anthropic import AnthropicAdapter
+        from weave_agent_sdk.llm.anthropic import AnthropicAdapter
 
         adapter = AnthropicAdapter(api_key="test-key", model="claude-test-model")
         assert adapter._model == "claude-test-model"
@@ -4228,9 +4228,9 @@ class TestE2EToolTimeoutMixedRound:
 
     @pytest.mark.asyncio
     async def test_e2e_iterative_loop_timeout_then_success(self):
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4280,8 +4280,8 @@ class TestE2EScheduledLoopRunStateFailure:
 
     @pytest.mark.asyncio
     async def test_e2e_scheduled_loop_run_survives_state_write_failure(self, caplog):
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4344,8 +4344,8 @@ class TestE2EMemoryScopesFromConfig:
 
     def test_e2e_memory_scopes_config_to_namespace(self, tmp_path):
         import yaml
-        from weave.config import load_config
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.config import load_config
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "memory_scopes.yaml"
         config_data = {
@@ -4366,7 +4366,7 @@ class TestE2EMemoryScopesFromConfig:
         with open(yaml_path, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         config = load_config(yaml_path)
         manager = MemoryManager(config.memory)
@@ -4384,8 +4384,8 @@ class TestE2EModelResolutionConfigToAdapter:
     """端到端测试：weave.yaml 模型名 → load_config → create_llm 适配器。"""
 
     def test_e2e_model_resolution_config_to_adapter(self, tmp_path, monkeypatch):
-        from weave.config import load_config
-        from weave.llm.factory import create_llm
+        from weave_agent_sdk.config import load_config
+        from weave_agent_sdk.llm.factory import create_llm
 
         monkeypatch.setenv("WEAVE_MODEL", "claude-e2e-resolved-2026")
 
@@ -4402,9 +4402,9 @@ class TestE2EModelResolutionConfigToAdapter:
         config = load_config(yaml_path)
         assert config.llm.model == "claude-e2e-resolved-2026"
 
-        with patch("weave.llm.anthropic.AnthropicAdapter") as mock_ad:
-            with patch("weave.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave.llm.factory.load_claude_env"):
+        with patch("weave_agent_sdk.llm.anthropic.AnthropicAdapter") as mock_ad:
+            with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
+                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
                     create_llm(provider="anthropic", model=config.llm.model)
                     mock_ad.assert_called_once()
                     _, kwargs = mock_ad.call_args
@@ -4428,8 +4428,8 @@ class TestRound3ToolTimeoutUnit:
     @pytest.mark.asyncio
     async def test_sync_tool_success_preserves_metadata(self):
         """同步 tool 成功执行时，应保留 tool_call_id / name 元数据且无 error。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 5.0
@@ -4450,8 +4450,8 @@ class TestRound3ToolTimeoutUnit:
     @pytest.mark.asyncio
     async def test_async_tool_timeout_error_message_format(self):
         """异步 tool 超时时，错误消息应包含 tool 名与精确超时值。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 0.001
@@ -4471,8 +4471,8 @@ class TestRound3ToolTimeoutUnit:
     @pytest.mark.asyncio
     async def test_tool_timeout_none_falls_back_to_default(self):
         """tool_timeout 配置为 None（非数值）时，应回退默认 30.0 且 tool 正常执行。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = None  # 非数值
@@ -4495,8 +4495,8 @@ class TestRound3ScheduledWriteUnit:
     @pytest.mark.asyncio
     async def test_state_write_sets_last_run_at_and_error_fields(self):
         """成功路径应写入 last_run_at（float 时间戳）与 last_run_error（None）。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4537,8 +4537,8 @@ class TestRound3ScheduledWriteUnit:
     @pytest.mark.asyncio
     async def test_on_end_still_called_when_state_write_fails(self, caplog):
         """State 写入失败时，on_end 仍应被调用，主流程不被阻塞。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4599,8 +4599,8 @@ class TestRound3AccessTypeUnit:
 
     def test_get_namespace_inactive_scope_raises(self):
         """get_namespace() 对未激活 scope 应抛出 ValueError（scope 校验仍保留）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
         manager.activate_scopes()
@@ -4611,8 +4611,8 @@ class TestRound3AccessTypeUnit:
 
     def test_get_backend_four_segment_namespace(self):
         """4 段 namespace 应正确解析末尾 access_type（state），不抛错。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
 
@@ -4658,8 +4658,8 @@ class TestRound3ScheduledRunE2E:
     @pytest.mark.asyncio
     async def test_scheduled_run_success_persists_state(self):
         """通过 run() 入口执行成功后，应持久化 last_run_at 与 last_run_error。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4692,8 +4692,8 @@ class TestRound3ScheduledRunE2E:
     @pytest.mark.asyncio
     async def test_scheduled_run_file_not_found_silent(self, caplog):
         """State 写入抛 FileNotFoundError（正常情况）时应静默通过，无告警。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4725,7 +4725,7 @@ class TestRound3RealConfigE2E:
 
     @pytest.fixture
     def real_config(self):
-        from weave.config import load_config
+        from weave_agent_sdk.config import load_config
         project_root = Path(__file__).parent.parent
         return load_config(project_root / "weave.yaml")
 
@@ -4748,7 +4748,7 @@ class TestRound3RealConfigE2E:
 
     def test_memory_manager_from_real_config(self, real_config):
         """真实 weave.yaml（无 memory 段 → 默认 scope）→ 合法/非法 access_type 行为正确。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         manager = MemoryManager(real_config.memory)
         manager.activate_scopes()
@@ -4772,9 +4772,9 @@ class TestRound3ToolLoopE2E:
     @pytest.mark.asyncio
     async def test_iterative_loop_fast_tool_success(self):
         """超时保护不误伤正常 tool：dict 结果正确流转，tool 计数被记录。"""
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4826,8 +4826,8 @@ class TestRound4ToolTimeoutUnit:
     @pytest.mark.asyncio
     async def test_sync_tool_exception_returns_structured_error(self):
         """同步 tool 抛异常时应返回结构化错误（RuntimeError: boom），不抛给上层。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 5.0
@@ -4846,8 +4846,8 @@ class TestRound4ToolTimeoutUnit:
     @pytest.mark.asyncio
     async def test_sync_tool_receives_multiple_kwargs(self):
         """同步 tool 的多个参数应通过 **tc.arguments 正确透传。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 5.0
@@ -4866,8 +4866,8 @@ class TestRound4ToolTimeoutUnit:
     @pytest.mark.asyncio
     async def test_sync_tool_none_result_no_error(self):
         """同步 tool 返回 None 时应视为成功（error=None，result=None）。"""
-        from weave.loop.iterative import _execute_tool
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import _execute_tool
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config.loop.tool_timeout = 5.0
@@ -4890,8 +4890,8 @@ class TestRound4ScheduledWriteUnit:
     @pytest.mark.asyncio
     async def test_execute_once_reports_state_write_in_memory_updated(self):
         """成功写入后，memory_updated['state'] 应反映实际写入计数（2 次/namespace）。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4918,8 +4918,8 @@ class TestRound4ScheduledWriteUnit:
     @pytest.mark.asyncio
     async def test_execute_once_uses_first_namespace_when_multiple(self):
         """get_namespaces 返回多个 state namespace 时，只使用第一个用于写入。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -4968,8 +4968,8 @@ class TestRound4AccessTypeUnit:
 
     def test_access_type_validated_before_scope_in_get_namespace(self):
         """get_namespace 中非法 access_type 应优先于 scope 校验抛出 ValueError。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig())
         with pytest.raises(ValueError) as excinfo:
@@ -4979,8 +4979,8 @@ class TestRound4AccessTypeUnit:
 
     def test_get_namespaces_empty_without_active_scopes(self):
         """未调用 activate_scopes 时，合法 access_type 的 get_namespaces 返回空列表。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig())
         assert manager.get_namespaces("stream") == []
@@ -4993,7 +4993,7 @@ class TestRound4R3ModelUnit:
 
     def test_resolve_model_empty_weave_model_falls_through_to_provider(self, monkeypatch):
         """WEAVE_MODEL 被显式置空字符串时，应回退到 provider 专用环境变量。"""
-        from weave.llm.factory import _resolve_model
+        from weave_agent_sdk.llm.factory import _resolve_model
 
         monkeypatch.setenv("WEAVE_MODEL", "")
         monkeypatch.setenv("OPENAI_MODEL", "gpt-fallback-2026")
@@ -5002,7 +5002,7 @@ class TestRound4R3ModelUnit:
 
     def test_openai_adapter_empty_model_error_mentions_config(self):
         """OpenAIAdapter 空模型错误信息应引导配置 weave.yaml / WEAVE_MODEL。"""
-        from weave.llm.openai import OpenAIAdapter
+        from weave_agent_sdk.llm.openai import OpenAIAdapter
 
         with pytest.raises(ValueError) as excinfo:
             OpenAIAdapter(api_key="test-key", model="")
@@ -5022,9 +5022,9 @@ class TestRound4ToolLoopE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_iterative_loop_sync_tool_exception_continues(self):
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5066,8 +5066,8 @@ class TestRound4ScheduledRunE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_scheduled_run_reports_state_writes_in_memory_updated(self):
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5127,8 +5127,8 @@ class TestRound4MemoryManagerE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_memory_manager_state_write_and_read(self):
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
         manager.activate_scopes({"default_id": "s1"})
@@ -5147,12 +5147,12 @@ class TestRound4CreateLLMDeepseekE2E:
     """端到端测试：create_llm(deepseek) 使用 WEAVE_MODEL 环境变量（第8轮修复项30）。"""
 
     def test_e2e_create_llm_deepseek_uses_weave_model_env(self, monkeypatch):
-        from weave.llm.factory import create_llm
+        from weave_agent_sdk.llm.factory import create_llm
 
         monkeypatch.setenv("WEAVE_MODEL", "deepseek-e2e-2026")
-        with patch("weave.llm.openai.OpenAIAdapter") as mock_ad:
-            with patch("weave.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave.llm.factory.load_claude_env"):
+        with patch("weave_agent_sdk.llm.openai.OpenAIAdapter") as mock_ad:
+            with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
+                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
                     create_llm(provider="deepseek", model=None)
                     mock_ad.assert_called_once()
                     _, kwargs = mock_ad.call_args
@@ -5235,14 +5235,14 @@ class TestRound5CronDowUnit:
 
     def test_next_cron_sunday_dow_zero(self):
         """cron DOW=0（周日）下一次触发必须是周日，不再偏移到周六。"""
-        from weave.loop.scheduled import _next_cron_timestamp
+        from weave_agent_sdk.loop.scheduled import _next_cron_timestamp
         ts = _next_cron_timestamp("0 0 * * 0", time.time())
         assert ts is not None
         assert _r5_cron_dow_of_ts(ts) == 0
 
     def test_next_cron_saturday_dow_six(self):
         """cron DOW=6（周六）下一次触发必须是周六，不再偏移到周五。"""
-        from weave.loop.scheduled import _next_cron_timestamp
+        from weave_agent_sdk.loop.scheduled import _next_cron_timestamp
         ts = _next_cron_timestamp("0 0 * * 6", time.time())
         assert ts is not None
         assert _r5_cron_dow_of_ts(ts) == 6
@@ -5254,7 +5254,7 @@ class TestRound5WSPassthroughUnit:
     def test_ws_passes_scope_hints_context_tool_filter(self):
         """ws.py 应读取 scope_hints/context/tool_filter 并透传给 _run_impl。"""
         import inspect
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         source = inspect.getsource(ws_agent_stream)
         assert 'scope_hints = data.get("scope_hints") or None' in source
@@ -5271,7 +5271,7 @@ class TestRound5IterativeKnowledgeUnit:
     def test_before_think_uses_real_user_input(self):
         """before_think 应接收真实 user_input，而非字面量 "continue"。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "memory_ctx = await self.before_think(agent, user_input)" in source
@@ -5285,7 +5285,7 @@ class TestRound5IterativeTrimUnit:
     def test_max_context_messages_constant_and_trim_logic(self):
         """_MAX_CONTEXT_MESSAGES 应为 20，且 run() 含裁剪逻辑。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
+        from weave_agent_sdk.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
 
         assert _MAX_CONTEXT_MESSAGES == 20
         source = inspect.getsource(IterativeLoop.run)
@@ -5327,7 +5327,7 @@ class TestRound5CronDowE2E:
 
     def test_e2e_cron_dow_not_shifted(self):
         """周日(0)/周一(1)/周六(6) 的 cron 触发日期均应与预期星期一致。"""
-        from weave.loop.scheduled import _next_cron_timestamp
+        from weave_agent_sdk.loop.scheduled import _next_cron_timestamp
 
         now = time.time()
         for dow, expected in ((0, 0), (1, 1), (6, 6)):
@@ -5369,8 +5369,8 @@ class TestRound5WSPassthroughE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_ws_passes_scope_hints_context_tool_filter(self):
-        from weave.event_bus import EventBus
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         bus = EventBus()
         weave = MagicMock()
@@ -5408,7 +5408,7 @@ class TestRound5IterativeKnowledgeE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_before_think_receives_real_user_input(self):
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5416,7 +5416,7 @@ class TestRound5IterativeKnowledgeE2E:
         agent._config.loop.stop_conditions = [{"type": "no_tool_calls"}]
         agent._config.llm.max_tokens = 100
         agent._config.llm.temperature = 0.0
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         agent._llm = AsyncMock()
         agent._llm.chat = AsyncMock(return_value=LLMResponse(content="answer", model="test"))
         agent._system_prompt = "System"
@@ -5445,9 +5445,9 @@ class TestRound5IterativeTrimE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_messages_trimmed_to_max_context(self):
-        from weave.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5478,7 +5478,7 @@ class TestRound5IterativeTrimE2E:
                 )
             return LLMResponse(content="final answer", model="test", tool_calls=None)
 
-        with patch("weave.loop.iterative.call_llm", side_effect=fake_call_llm):
+        with patch("weave_agent_sdk.loop.iterative.call_llm", side_effect=fake_call_llm):
             loop = IterativeLoop()
             loop.on_start = AsyncMock()
             loop.on_end = AsyncMock()
@@ -5527,7 +5527,7 @@ class TestRound6TrimGroupUnit:
     def test_trim_source_has_tool_group_skip(self):
         """run() 裁剪时遇到窗口起点为 tool 消息应向前跳过完整调用组。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "if len(messages) > _MAX_CONTEXT_MESSAGES:" in source
@@ -5538,7 +5538,7 @@ class TestRound6TrimGroupUnit:
     def test_trim_source_keeps_system_and_window(self):
         """裁剪窗口应保留 system prompt 与最近 _MAX_CONTEXT_MESSAGES-1 条消息。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "trimmed = [messages[0], messages[1]] + messages[-(_MAX_CONTEXT_MESSAGES - 2):]" in source
@@ -5551,7 +5551,7 @@ class TestRound6MemoryWritesResetUnit:
     def test_execute_once_source_resets_memory_writes(self):
         """_execute_once 起始处应 pop 掉 _memory_writes，防止跨触发累加。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop._execute_once)
         assert 'agent.__dict__.pop("_memory_writes", None)' in source
@@ -5559,8 +5559,8 @@ class TestRound6MemoryWritesResetUnit:
     @pytest.mark.asyncio
     async def test_execute_once_no_cross_trigger_stream_count(self):
         """同一 agent 连续两次触发：每次的 stream 写计数都从 1 开始，不累加。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5595,8 +5595,8 @@ class TestRound6MemoryWritesResetUnit:
     @pytest.mark.asyncio
     async def test_execute_once_stale_memory_writes_not_leaked(self):
         """上次触发遗留的 _memory_writes 应被清除，不泄漏到本次结果。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5634,7 +5634,7 @@ class TestRound6SharedLockUnit:
     def test_run_source_acquires_shared_lock_per_trigger(self):
         """run() 常驻循环应在每次触发时获取 agent 共享锁（_run_locks）。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         # 共享锁逻辑已从 run() 移入 _execute_trigger()
         # （每次触发持锁，避免常驻周期持锁饿死其他操作）
@@ -5647,8 +5647,8 @@ class TestRound6SharedLockUnit:
     @pytest.mark.asyncio
     async def test_run_single_execution_does_not_acquire_lock(self):
         """未配置 schedule 的单次执行路径不应创建共享锁。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5674,7 +5674,7 @@ class TestRound6HandleShutdownUnit:
     def test_handle_shutdown_source_uses_call_soon_threadsafe(self):
         """handle_shutdown 应通过 loop.call_soon_threadsafe 调度任务取消。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop.handle_shutdown)
         assert "call_soon_threadsafe" in source
@@ -5683,7 +5683,7 @@ class TestRound6HandleShutdownUnit:
 
     def test_handle_shutdown_schedules_cancel_via_call_soon_threadsafe(self):
         """handle_shutdown 应将 task.cancel 交给 call_soon_threadsafe，而非直接调用。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
         fake_task = MagicMock()
@@ -5703,7 +5703,7 @@ class TestRound6HandleShutdownUnit:
 
     def test_handle_shutdown_noop_when_task_none_or_done(self):
         """_current_task 为 None 或已 done 时，不应调用 call_soon_threadsafe。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         # None
         loop = ScheduledLoop()
@@ -5731,9 +5731,9 @@ class TestRound6TrimGroupE2E:
     @pytest.mark.asyncio
     async def test_e2e_no_orphaned_tool_messages_after_trim(self):
         """12 轮 tool 迭代中，每次注入 LLM 的窗口都不超过上限且不以 tool 消息开头。"""
-        from weave.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5764,7 +5764,7 @@ class TestRound6TrimGroupE2E:
                 )
             return LLMResponse(content="final answer", model="test", tool_calls=None)
 
-        with patch("weave.loop.iterative.call_llm", side_effect=fake_call_llm):
+        with patch("weave_agent_sdk.loop.iterative.call_llm", side_effect=fake_call_llm):
             loop = IterativeLoop()
             loop.on_start = AsyncMock()
             loop.on_end = AsyncMock()
@@ -5790,9 +5790,9 @@ class TestRound6MemoryWritesResetE2E:
     @pytest.mark.asyncio
     async def test_e2e_resident_scheduled_resets_memory_writes_across_triggers(self):
         """常驻循环两次触发各自报告独立的 stream 写计数（1），不累加。"""
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5849,9 +5849,9 @@ class TestRound6SharedLockE2E:
     @pytest.mark.asyncio
     async def test_e2e_scheduled_per_trigger_holds_shared_lock(self):
         """每次触发执行期间，agent 的每事件循环共享锁应处于锁定状态。"""
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5895,9 +5895,9 @@ class TestRound6HandleShutdownE2E:
     @pytest.mark.asyncio
     async def test_e2e_handle_shutdown_cancels_gracefully(self):
         """调用 handle_shutdown 后常驻循环应被取消并正常返回最近一次结果。"""
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -5944,7 +5944,7 @@ class TestRound6HandleShutdownE2E:
 # 本轮新增：10 个单元测试 + 5 个端到端测试
 # ============================================================
 
-from weave.loop.base import BaseLoop
+from weave_agent_sdk.loop.base import BaseLoop
 
 
 class _Round7ConcreteLoop(BaseLoop):
@@ -6015,7 +6015,7 @@ class TestRound7TriggerFailureUnit:
     def test_run_source_wraps_trigger_in_try_except(self):
         """run() 每次触发应被 try/except 包裹，失败记录告警后继续等待下次触发。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         # 触发失败兕底已从 run() 移入 _execute_trigger()
         # （单次触发失败不再终止整个调度器）
@@ -6033,7 +6033,7 @@ class TestRound7DataChangeSubscriptionUnit:
     def test_run_creates_resident_subscription_before_loop(self):
         """run() 应在 while 循环之前建立 data_change 常驻订阅（消除执行期间事件丢失窗口）。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop.run)
         assert 'data_stream = bus.subscribe("data_change")' in source
@@ -6050,7 +6050,7 @@ class TestRound7WsDocUnit:
     def test_ws_docstring_documents_five_event_types(self):
         """ws_agent_stream 文档/实现应明确包含 5 种事件类型。"""
         import inspect
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         source = inspect.getsource(ws_agent_stream)
         for et in ("token", "tool_call", "tool_result", "done", "error"):
@@ -6059,7 +6059,7 @@ class TestRound7WsDocUnit:
     def test_ws_subscribes_to_documented_event_types(self):
         """ws.py 订阅的事件类型应与文档声明完全一致（5 种）。"""
         import inspect
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         source = inspect.getsource(ws_agent_stream)
         assert '"token", "tool_call", "tool_result", "done", "error"' in source
@@ -6070,7 +6070,7 @@ class TestRound7MemoryContextLimitUnit:
 
     def test_loop_config_has_memory_context_limit_default_20(self):
         """LoopConfig 应包含 memory_context_limit 字段，默认值 20。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         config = LoopConfig()
         assert config.memory_context_limit == 20
@@ -6136,9 +6136,9 @@ class TestRound7ReentryE2E:
     @pytest.mark.asyncio
     async def test_e2e_second_arun_on_resident_scheduled_raises_runtime_error(self):
         """首个 arun 启动常驻调度后，再次 arun 应抛 RuntimeError。"""
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -6195,9 +6195,9 @@ class TestRound7TriggerFailureE2E:
     @pytest.mark.asyncio
     async def test_e2e_trigger_failure_does_not_kill_scheduler(self, caplog):
         from types import SimpleNamespace
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = SimpleNamespace(
             _config=SimpleNamespace(loop=SimpleNamespace(schedule="@on_data_change")),
@@ -6243,9 +6243,9 @@ class TestRound7DataChangeE2E:
     @pytest.mark.asyncio
     async def test_e2e_data_change_during_execution_not_lost(self):
         from types import SimpleNamespace
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = SimpleNamespace(
             _config=SimpleNamespace(loop=SimpleNamespace(schedule="@on_data_change")),
@@ -6292,9 +6292,9 @@ class TestRound7WsE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_ws_forwards_all_documented_event_types(self):
-        from weave.event_bus import EventBus
-        from weave.server.ws import ws_agent_stream
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.server.ws import ws_agent_stream
+        from weave_agent_sdk.types import LoopResult
 
         bus = EventBus()
         weave = MagicMock()
@@ -6381,7 +6381,7 @@ class TestRound8EnvVarRegexFix:
 
         若缺少末尾 ?，${VAR} 无默认值格式将完全不匹配（第7轮回归根因）。
         """
-        from weave.config import _ENV_VAR_RE
+        from weave_agent_sdk.config import _ENV_VAR_RE
 
         assert _ENV_VAR_RE.pattern == r"\$\{(\w+)(?::(-?)([^}]*))?\}", \
             f"可选组末尾缺少 ?：{_ENV_VAR_RE.pattern}"
@@ -6391,7 +6391,7 @@ class TestRound8EnvVarRegexFix:
 
         这是本轮修复的核心行为：第7轮 regex 丢失可选组 ? 后该格式完全不匹配。
         """
-        from weave.config import _ENV_VAR_RE
+        from weave_agent_sdk.config import _ENV_VAR_RE
 
         m = _ENV_VAR_RE.fullmatch("${FOO}")
         assert m is not None, "${FOO} 无默认值格式应被匹配（可选组 ? 已补回）"
@@ -6399,7 +6399,7 @@ class TestRound8EnvVarRegexFix:
 
     def test_env_var_re_fullmatch_colon_default(self):
         """${VAR:default} POSIX 格式应被完整匹配（group(2)='' 表示仅有冒号无 -）。"""
-        from weave.config import _ENV_VAR_RE
+        from weave_agent_sdk.config import _ENV_VAR_RE
 
         m = _ENV_VAR_RE.fullmatch("${FOO:bar}")
         assert m is not None
@@ -6407,7 +6407,7 @@ class TestRound8EnvVarRegexFix:
 
     def test_env_var_re_fullmatch_dash_default_excludes_dash(self):
         """${VAR:-default} Bash 格式的 - 应被独立捕获，不进入默认值（回归）。"""
-        from weave.config import _ENV_VAR_RE
+        from weave_agent_sdk.config import _ENV_VAR_RE
 
         m = _ENV_VAR_RE.fullmatch("${FOO:-bar}")
         assert m is not None
@@ -6551,7 +6551,7 @@ class TestRound9IterativeTrimKeepUserInputUnit:
     def test_trim_source_keeps_current_user_input(self):
         """裁剪应保留 messages[0](system) 与 messages[1](当前 user 输入)。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "trimmed = [messages[0], messages[1]] + messages[-(_MAX_CONTEXT_MESSAGES - 2):]" in source
@@ -6559,7 +6559,7 @@ class TestRound9IterativeTrimKeepUserInputUnit:
     def test_trim_source_window_is_max_minus_two(self):
         """裁剪窗口为最近 _MAX_CONTEXT_MESSAGES-2 条（system+user 占 2 条）。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "start = len(messages) - (_MAX_CONTEXT_MESSAGES - 2)" in source
@@ -6572,7 +6572,7 @@ class TestRound9ScheduledLastRunUnit:
     def test_execute_once_source_sets_last_run(self):
         """_execute_once 应设置 agent._last_run = time.time()。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop._execute_once)
         assert "agent._last_run = time.time()" in source
@@ -6580,8 +6580,8 @@ class TestRound9ScheduledLastRunUnit:
     @pytest.mark.asyncio
     async def test_execute_once_updates_last_run_after_run(self):
         """_execute_once 执行后 agent._last_run 应为最近的时间戳。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -6618,7 +6618,7 @@ class TestRound9ScheduledPayloadUnit:
     def test_run_source_reads_payload_input(self):
         """run() 事件驱动模式应读取 data_change payload 的 input 字段作为触发输入。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop.run)
         assert "event_data = _event.data or {}" in source
@@ -6632,7 +6632,7 @@ class TestRound9StreamToolFilterUnit:
     def test_stream_signature_has_tool_filter(self):
         """stream() 方法签名应包含 tool_filter 参数。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         sig = inspect.signature(Weave.stream)
         assert "tool_filter" in sig.parameters
@@ -6640,7 +6640,7 @@ class TestRound9StreamToolFilterUnit:
     def test_stream_passes_tool_filter_to_run_impl(self):
         """stream() 应将 tool_filter 透传给 _run_impl。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave.stream)
         assert "self._run_impl(input, scope_hints, context, tool_filter, _streaming=True)" in source
@@ -6652,14 +6652,14 @@ class TestRound9RunLocksCleanupUnit:
     def test_run_impl_calls_cleanup_closed_run_locks(self):
         """_run_impl 起始处应调用 _cleanup_closed_run_locks()。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave._run_impl)
         assert "self._cleanup_closed_run_locks()" in source
 
     def test_cleanup_removes_closed_loop_locks(self):
         """_cleanup_closed_run_locks 应移除已关闭事件循环的锁条目，保留活动循环。"""
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         class _FakeClosedLoop:
             def is_closed(self):
@@ -6681,7 +6681,7 @@ class TestRound9RunLocksCleanupUnit:
 
     def test_cleanup_noop_when_locks_empty(self):
         """_run_locks 不存在或为空时 _cleanup_closed_run_locks 不报错。"""
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         weave = Weave.__new__(Weave)
         weave.__dict__.pop("_run_locks", None)
@@ -6702,9 +6702,9 @@ class TestRound9IterativeTrimE2E:
     @pytest.mark.asyncio
     async def test_e2e_trim_keeps_current_user_input(self):
         """15 轮 tool 迭代中，每次注入 LLM 的窗口都保留当前 user 输入。"""
-        from weave.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -6735,7 +6735,7 @@ class TestRound9IterativeTrimE2E:
                 )
             return LLMResponse(content="final answer", model="test", tool_calls=None)
 
-        with patch("weave.loop.iterative.call_llm", side_effect=fake_call_llm):
+        with patch("weave_agent_sdk.loop.iterative.call_llm", side_effect=fake_call_llm):
             loop = IterativeLoop()
             loop.on_start = AsyncMock()
             loop.on_end = AsyncMock()
@@ -6760,9 +6760,9 @@ class TestRound9ScheduledLastRunE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_scheduled_updates_last_run_per_trigger(self):
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -6815,9 +6815,9 @@ class TestRound9ScheduledPayloadE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_data_change_payload_drives_trigger_input(self):
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -6865,8 +6865,8 @@ class TestRound9StreamToolFilterE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_stream_tool_filter_filters_tools(self):
-        from weave.event_bus import EventBus
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.types import LoopResult
 
         def tool_a(query: str) -> str:
             return "a"
@@ -6920,7 +6920,7 @@ class TestRound9RunLocksCleanupE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_run_impl_cleans_closed_loop_locks(self):
-        from weave.types import LoopResult
+        from weave_agent_sdk.types import LoopResult
 
         class _FakeClosedLoop:
             def is_closed(self):
@@ -6966,7 +6966,7 @@ class TestRound10TrimUnit:
     def test_trim_skip_branch_preserves_user_input(self):
         """裁剪的 tool 跳过分支重建窗口时同样保留 [system, user]，当前 user 输入不被裁掉。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         # 跳过分支重建窗口必须同样保留 messages[1]（当前 user 输入）
@@ -6975,7 +6975,7 @@ class TestRound10TrimUnit:
     @pytest.mark.asyncio
     async def test_memory_context_injected_into_system_not_user(self):
         """memory context 应注入 system prompt（messages[0]），不覆盖 messages[1] 的当前 user 输入。"""
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -6983,7 +6983,7 @@ class TestRound10TrimUnit:
         agent._config.loop.stop_conditions = [{"type": "no_tool_calls"}]
         agent._config.llm.max_tokens = 100
         agent._config.llm.temperature = 0.0
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         agent._llm = AsyncMock()
         agent._llm.chat = AsyncMock(return_value=LLMResponse(content="answer", model="test"))
         agent._system_prompt = "Base system"
@@ -6998,7 +6998,7 @@ class TestRound10TrimUnit:
             captured.append(list(messages))
             return LLMResponse(content="answer", model="test")
 
-        with patch("weave.loop.iterative.call_llm", side_effect=fake_call_llm):
+        with patch("weave_agent_sdk.loop.iterative.call_llm", side_effect=fake_call_llm):
             loop = IterativeLoop()
             loop.on_start = AsyncMock()
             loop.on_end = AsyncMock()
@@ -7025,7 +7025,7 @@ class TestRound10ScheduledLastRunUnit:
     """第9轮修复项2（scheduled 每触发更新 status().last_run）—— 第10轮补充单元测试。"""
 
     def _make_agent(self, llm_error=None, state_error=None):
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -7052,7 +7052,7 @@ class TestRound10ScheduledLastRunUnit:
     @pytest.mark.asyncio
     async def test_last_run_updated_when_state_write_fails(self, caplog):
         """State 写入失败时，_last_run 仍应更新（更新先于 state 写入，不被失败阻断）。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         agent = self._make_agent(state_error=RuntimeError("storage down"))
         loop = ScheduledLoop()
@@ -7071,7 +7071,7 @@ class TestRound10ScheduledLastRunUnit:
     @pytest.mark.asyncio
     async def test_last_run_not_updated_when_llm_call_fails(self):
         """LLM 调用抛异常时，_execute_once 传播异常且 _last_run 保持不变（None）。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         agent = self._make_agent(llm_error=RuntimeError("llm down"))
         loop = ScheduledLoop()
@@ -7092,7 +7092,7 @@ class TestRound10ScheduledPayloadUnit:
     def test_payload_read_happens_inside_resident_loop(self):
         """payload 触发输入的读取应位于常驻 while 循环内（每事件读取），而非仅启动时一次。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop.run)
         while_idx = source.index("while not self._shutting_down:")
@@ -7104,7 +7104,7 @@ class TestRound10StreamToolFilterUnit:
     """第9轮修复项4（stream() 入口支持 tool_filter）—— 第10轮补充单元测试。"""
 
     def _make_weave(self, loop_run):
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         def tool_a(query: str) -> str:
             return "a"
@@ -7134,7 +7134,7 @@ class TestRound10StreamToolFilterUnit:
     @pytest.mark.asyncio
     async def test_stream_empty_tool_filter_is_noop(self):
         """tool_filter=[]（空列表，falsy）不应过滤任何工具。"""
-        from weave.types import LoopResult
+        from weave_agent_sdk.types import LoopResult
 
         seen = {}
 
@@ -7156,7 +7156,7 @@ class TestRound10StreamToolFilterUnit:
     @pytest.mark.asyncio
     async def test_stream_tool_filter_restores_tools_on_error(self):
         """loop.run 抛异常时，stream() 仍应在 finally 恢复完整的工具表（无泄漏）。"""
-        from weave.types import LoopResult
+        from weave_agent_sdk.types import LoopResult
 
         async def fake_loop_run(agent_, user_input):
             raise ValueError("boom")
@@ -7181,14 +7181,14 @@ class TestRound10RunLocksCleanupUnit:
     def test_cleanup_iterates_over_snapshot_list(self):
         """_cleanup_closed_run_locks 应遍历 list(locks) 快照，避免边删边遍历。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave._cleanup_closed_run_locks)
         assert "for existing_loop in list(locks):" in source
 
     def test_cleanup_keeps_loop_without_is_closed_attr(self):
         """无 is_closed 属性的事件循环对象应被保留（无法判定关闭即视为存活）。"""
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         class _Closed:
             def is_closed(self):
@@ -7216,7 +7216,7 @@ class TestRound10RunLocksCleanupUnit:
 
     def test_cleanup_preserves_open_lock_object_identity(self):
         """已关闭事件循环的锁被移除，活动事件循环的锁对象保持原引用。"""
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         class _Closed:
             def is_closed(self):
@@ -7249,9 +7249,9 @@ class TestRound10IterativeTrimE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_multi_tool_trim_keeps_user_input_no_orphan(self):
-        from weave.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -7289,7 +7289,7 @@ class TestRound10IterativeTrimE2E:
                 )
             return LLMResponse(content="final answer", model="test", tool_calls=None)
 
-        with patch("weave.loop.iterative.call_llm", side_effect=fake_call_llm):
+        with patch("weave_agent_sdk.loop.iterative.call_llm", side_effect=fake_call_llm):
             loop = IterativeLoop()
             loop.on_start = AsyncMock()
             loop.on_end = AsyncMock()
@@ -7321,9 +7321,9 @@ class TestRound10ScheduledLastRunE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_last_run_updates_each_trigger_despite_state_failure(self, caplog):
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -7389,9 +7389,9 @@ class TestRound10ScheduledPayloadE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_data_change_payload_empty_string_input(self):
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -7432,8 +7432,8 @@ class TestRound10StreamToolFilterE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_stream_tool_filter_excludes_all_then_restores(self):
-        from weave.event_bus import EventBus
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.types import LoopResult
 
         def tool_a(query: str) -> str:
             return "a"
@@ -7487,7 +7487,7 @@ class TestRound10RunLocksCleanupE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_run_impl_cleans_closed_keeps_open(self):
-        from weave.types import LoopResult
+        from weave_agent_sdk.types import LoopResult
 
         class _ClosedLoop:
             def is_closed(self):
@@ -7538,7 +7538,7 @@ class TestRound11StreamTimeoutGuardUnit:
     def test_stream_source_has_timeout_guard_wrapper(self):
         """stream() 源码应包含带 wait_for 的整体超时兜底包装任务。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave.stream)
         # 第14轮修正：空闲超时语义（当前实现）——wait_for 应用于消费端
@@ -7550,7 +7550,7 @@ class TestRound11StreamTimeoutGuardUnit:
     def test_stream_source_guard_only_when_positive_timeout(self):
         """整体超时兜底应仅在 timeout 为正值时启用（0/负值不启用，避免误杀正常流程）。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave.stream)
         assert "isinstance(stream_timeout, (int, float)) and stream_timeout > 0" in source
@@ -7565,14 +7565,14 @@ class TestRound11ScheduledShutdownThreadSafeUnit:
     def test_handle_shutdown_source_call_soon_threadsafe_call_later(self):
         """执行中分支应经 call_soon_threadsafe 调度 call_later(30.0, _force_cancel)。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop.handle_shutdown)
         assert "call_soon_threadsafe(lambda: loop.call_later(30.0, _force_cancel))" in source
 
     def test_handle_shutdown_executing_schedules_graceful_cancel(self):
         """执行中分支不应直接 cancel，而是经 call_soon_threadsafe 注册 30s 宽限定时器。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
         fake_task = MagicMock()
@@ -7605,7 +7605,7 @@ class TestRound11KnowledgeSearchGuardUnit:
 
     def test_knowledge_search_empty_query_returns_empty(self):
         """空查询字符串应返回空列表，不触发 SQL 构造。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         backend = SQLiteBackend(":memory:")
         backend.knowledge_add("hello world", "scope1:u1:knowledge", None)
@@ -7614,7 +7614,7 @@ class TestRound11KnowledgeSearchGuardUnit:
 
     def test_knowledge_search_whitespace_query_returns_empty(self):
         """纯空白查询字符串应返回空列表（query.split() 无有效词）。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         backend = SQLiteBackend(":memory:")
         backend.knowledge_add("hello world", "scope1:u1:knowledge", None)
@@ -7623,7 +7623,7 @@ class TestRound11KnowledgeSearchGuardUnit:
 
     def test_knowledge_search_normal_query_still_works(self):
         """正常非空查询仍应返回匹配结果（回归，守卫不误伤正常检索）。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         backend = SQLiteBackend(":memory:")
         backend.knowledge_add("alpha beta gamma", "scope1:u1:knowledge", None)
@@ -7640,7 +7640,7 @@ class TestRound11EventBusDocstringUnit:
     def test_event_bus_docstring_documents_five_event_types(self):
         """event_bus 模块 docstring 应明确列出 5 种不可变契约事件类型。"""
         import inspect
-        import weave.event_bus as eb
+        import weave_agent_sdk.event_bus as eb
 
         source = inspect.getsource(eb)
         for et in ("token", "tool_call", "tool_result", "done", "error"):
@@ -7655,7 +7655,7 @@ class TestRound11IterativeOutputFallbackUnit:
     def test_iterative_output_fallback_source_has_last_assistant_content(self):
         """run() 源码应追踪最后一条 assistant 文本，并在最终输出时回退到它。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "last_assistant_content" in source
@@ -7664,7 +7664,7 @@ class TestRound11IterativeOutputFallbackUnit:
     def test_iterative_output_fallback_source_output_expression(self):
         """最终输出表达式应依次回退：final_output → last_assistant_content → 最后消息。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "output = final_output or last_assistant_content or messages[-1].content" in source
@@ -7681,7 +7681,7 @@ class TestRound11StreamTimeoutE2E:
     @pytest.mark.asyncio
     async def test_e2e_stream_hanging_run_emits_error_within_timeout(self):
         """_run_impl 挂起（不产生任何事件）时，stream() 应在 loop.timeout 后 emit error。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -7720,7 +7720,7 @@ class TestRound11ScheduledShutdownE2E:
     async def test_e2e_handle_shutdown_executing_keeps_task_during_grace(self):
         """执行中分支调用 handle_shutdown 后，任务不应被立即取消（宽限 30s）。"""
         import contextlib
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
 
@@ -7750,7 +7750,7 @@ class TestRound11KnowledgeSearchE2E:
 
     def test_e2e_knowledge_search_empty_query_safe(self, tmp_path):
         """真实 SQLite 后端：空/纯空白查询返回 []，正常查询仍命中，全程不崩溃。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         db = tmp_path / "kb" / "mem.db"
         backend = SQLiteBackend(str(db))
@@ -7771,8 +7771,8 @@ class TestRound11EventBusDocstringE2E:
     def test_e2e_event_bus_docstring_aligned_with_stream_subscribe(self):
         """event_bus 文档声明的 5 种事件类型应与 agent.stream() 订阅的事件完全一致。"""
         import inspect
-        import weave.event_bus as eb
-        from weave.agent import Weave
+        import weave_agent_sdk.event_bus as eb
+        from weave_agent_sdk.agent import Weave
 
         bus_src = inspect.getsource(eb)
         stream_src = inspect.getsource(Weave.stream)
@@ -7790,9 +7790,9 @@ class TestRound11IterativeOutputFallbackE2E:
     @pytest.mark.asyncio
     async def test_e2e_iterative_output_falls_back_to_last_assistant_text(self):
         """max_iterations 耗尽时 output 统一为"未收敛"标记（第16轮修复项5：不再回退陈旧文本）。"""
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -7851,7 +7851,7 @@ class TestRound12WsContractUnit:
     def test_ws_source_no_run_complete_or_llm_token(self):
         """ws.py 全文件不应再出现旧事件名 run_complete / llm_token（漂移根因守卫）。"""
         import inspect
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         source = inspect.getsource(ws_agent_stream)
         assert "run_complete" not in source, "旧事件名 run_complete 不应残留"
@@ -7860,7 +7860,7 @@ class TestRound12WsContractUnit:
     def test_ws_subscribe_string_contract(self):
         """ws.py 订阅字符串应精确等于 5 种契约事件类型。"""
         import inspect
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         source = inspect.getsource(ws_agent_stream)
         assert '"token", "tool_call", "tool_result", "done", "error"' in source
@@ -7872,7 +7872,7 @@ class TestRound12ScheduledTriggerUnit:
     def test_execute_trigger_source_holds_shared_lock(self):
         """_execute_trigger 应包含按触发周期持共享锁的逻辑。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop._execute_trigger)
         assert 'locks = agent.__dict__.setdefault("_run_locks", {})' in source
@@ -7882,7 +7882,7 @@ class TestRound12ScheduledTriggerUnit:
     def test_run_source_no_shared_lock_logic(self):
         """run() 不应再包含共享锁获取逻辑（已移入 _execute_trigger，防回退）。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop.run)
         assert 'agent.__dict__.setdefault("_run_locks", {})' not in source
@@ -7890,7 +7890,7 @@ class TestRound12ScheduledTriggerUnit:
     def test_execute_trigger_source_wraps_failure(self):
         """_execute_trigger 应包含触发失败兜底（告警 + 继续等待下次触发）。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop._execute_trigger)
         assert "will retry on next schedule" in source
@@ -7899,7 +7899,7 @@ class TestRound12ScheduledTriggerUnit:
     def test_run_source_no_trigger_try_except(self):
         """run() 不应再包含触发失败兜底（已移入 _execute_trigger，防回退）。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop.run)
         assert "will retry on next schedule" not in source
@@ -7907,7 +7907,7 @@ class TestRound12ScheduledTriggerUnit:
     @pytest.mark.asyncio
     async def test_execute_trigger_returns_none_on_failure(self, caplog):
         """_execute_once 抛异常时 _execute_trigger 应返回 None 并记录告警。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         agent = MagicMock()
         loop = ScheduledLoop()
@@ -7922,8 +7922,8 @@ class TestRound12ScheduledTriggerUnit:
     @pytest.mark.asyncio
     async def test_execute_trigger_returns_result_on_success(self):
         """_execute_once 成功时 _execute_trigger 应原样返回 LoopResult。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = MagicMock()
         loop = ScheduledLoop()
@@ -7942,7 +7942,7 @@ class TestRound12EventMinIntervalUnit:
 
     def test_loop_config_has_event_min_interval_default_1_0(self):
         """LoopConfig.event_min_interval 默认值应为 1.0 秒。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         config = LoopConfig()
         assert config.event_min_interval == 1.0
@@ -7980,9 +7980,9 @@ class TestRound12WsContractE2E:
     @pytest.mark.asyncio
     async def test_e2e_ws_forwards_contract_events(self):
         """伪 WebSocket 应收到 token/tool_call/tool_result/done 且无 error。"""
-        from weave.event_bus import EventBus
-        from weave.server.ws import ws_agent_stream
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.server.ws import ws_agent_stream
+        from weave_agent_sdk.types import LoopResult
 
         bus = EventBus()
         weave = MagicMock()
@@ -8011,9 +8011,9 @@ class TestRound12WsContractE2E:
     @pytest.mark.asyncio
     async def test_e2e_ws_done_event_schema(self):
         """done 事件 data 应携带 output/elapsed_ms/iterations（契约 schema）。"""
-        from weave.event_bus import EventBus
-        from weave.server.ws import ws_agent_stream
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.server.ws import ws_agent_stream
+        from weave_agent_sdk.types import LoopResult
 
         bus = EventBus()
         weave = MagicMock()
@@ -8038,9 +8038,9 @@ class TestRound12WsContractE2E:
     @pytest.mark.asyncio
     async def test_e2e_ws_scope_hints_passthrough_done_event(self):
         """scope_hints/context/tool_filter 透传 + 完成事件为 done（修正旧 run_complete 断言）。"""
-        from weave.event_bus import EventBus
-        from weave.server.ws import ws_agent_stream
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.server.ws import ws_agent_stream
+        from weave_agent_sdk.types import LoopResult
 
         bus = EventBus()
         weave = MagicMock()
@@ -8076,9 +8076,9 @@ class TestRound12ScheduledE2E:
     async def test_e2e_trigger_failure_logged_and_continues(self, caplog):
         """_execute_trigger 单次触发失败记录告警并返回 None，调度器继续等待下次触发。"""
         from types import SimpleNamespace
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = SimpleNamespace(
             _config=SimpleNamespace(
@@ -8119,9 +8119,9 @@ class TestRound12ScheduledE2E:
     @pytest.mark.asyncio
     async def test_e2e_data_change_payload_drives_trigger_input(self):
         """data_change payload 的 input 字段驱动触发输入（无节流时即时生效）。"""
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -8179,7 +8179,7 @@ class TestRound13StreamTimeoutConfigUnit:
 
     def test_loop_config_stream_timeout_default_none_and_semantic_separation(self):
         """LoopConfig.stream_timeout 默认 None（不启用），与 timeout(宽限 5.0) 语义分离。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         config = LoopConfig()
         assert config.stream_timeout is None
@@ -8238,7 +8238,7 @@ class TestRound13StreamTimeoutSourceUnit:
     def test_stream_uses_stream_timeout_not_loop_timeout(self):
         """stream() 应读取 loop.stream_timeout 作为整体超时，而非复用 loop.timeout。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave.stream)
         # 从配置读取 stream_timeout（默认不启用）
@@ -8254,7 +8254,7 @@ class TestRound13StreamTimeoutSourceUnit:
     def test_ws_uses_stream_timeout_for_overall_timeout(self):
         """ws.py 应读取 loop.stream_timeout 并作为整体超时兜底（与 agent.stream 一致）。"""
         import inspect
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         source = inspect.getsource(ws_agent_stream)
         assert 'stream_timeout = getattr(weave._config.loop, "stream_timeout", None)' in source
@@ -8271,7 +8271,7 @@ class TestRound13StreamTimeoutDisabledUnit:
     @pytest.mark.asyncio
     async def test_stream_timeout_disabled_when_non_positive(self):
         """stream_timeout 为 0/负值/非数值（不启用）时，慢速运行应正常完成，不被整体超时误杀。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         for bad_timeout in (0, -1, "abc"):
             weave = Weave.__new__(Weave)
@@ -8283,7 +8283,7 @@ class TestRound13StreamTimeoutDisabledUnit:
 
             async def slow_impl(*args, **kwargs):
                 await asyncio.sleep(0.2)  # 超过 loop.timeout=0.05 但正常完成
-                from weave.types import LoopResult
+                from weave_agent_sdk.types import LoopResult
                 return LoopResult(output="done", elapsed_ms=200, iterations=1, memory_updated={})
 
             weave._run_impl = slow_impl
@@ -8304,7 +8304,7 @@ class TestRound13IterativeSourceUnit:
     def test_text_pattern_checked_before_tool_calls(self):
         """text_pattern 停止条件应位于 or 左侧（先判断），不被 tool_calls 短路。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "_matches_text_pattern(response.content, stop_conditions) or not response.tool_calls" in source
@@ -8317,7 +8317,7 @@ class TestRound13IterativeSourceUnit:
     def test_output_fallback_uses_last_non_empty_assistant(self):
         """output 回退应只记录最近的非空 assistant 文本（if response.content 守卫）。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "if response.content:" in source
@@ -8331,7 +8331,7 @@ class TestRound13ScheduledZeroIntervalUnit:
     def test_wait_for_next_run_zero_interval_guard_source(self):
         """_wait_for_next_run 对 interval<=0 应回退 60s 并记录告警（源码）。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop._wait_for_next_run)
         assert "if interval <= 0:" in source
@@ -8342,7 +8342,7 @@ class TestRound13ScheduledZeroIntervalUnit:
     @pytest.mark.asyncio
     async def test_wait_for_next_run_zero_interval_falls_back_to_60s(self, caplog):
         """schedule="0" 时：告警记录 + 按 60s 间隔（1.0s 分片睡眠 60 次）而非忙循环。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
         agent = MagicMock()
@@ -8356,9 +8356,9 @@ class TestRound13ScheduledZeroIntervalUnit:
             sleep_calls.append(secs)
             now["t"] += secs
 
-        with patch("weave.loop.scheduled.time.time", side_effect=fake_time):
+        with patch("weave_agent_sdk.loop.scheduled.time.time", side_effect=fake_time):
             with patch("asyncio.sleep", new=fake_sleep):
-                with caplog.at_level(logging.WARNING, logger="weave.loop.scheduled"):
+                with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.loop.scheduled"):
                     await asyncio.wait_for(loop._wait_for_next_run(agent, "0"), timeout=2.0)
 
         # 60s 间隔按 1.0s 分片睡眠恰好 60 次（若是 0 间隔忙循环则为 0 次/无限紧循环）
@@ -8374,7 +8374,7 @@ class TestRound13StreamSlowRunE2E:
     @pytest.mark.asyncio
     async def test_e2e_default_timeout_does_not_kill_slow_run(self):
         """默认配置（stream_timeout=None）下，运行耗时超过 loop.timeout=0.05 仍应正常完成。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -8385,7 +8385,7 @@ class TestRound13StreamSlowRunE2E:
 
         async def slow_impl(*args, **kwargs):
             await asyncio.sleep(0.2)  # 超过 loop.timeout=0.05 但正常完成
-            from weave.types import LoopResult
+            from weave_agent_sdk.types import LoopResult
             return LoopResult(output="slow done", elapsed_ms=200, iterations=1, memory_updated={})
 
         weave._run_impl = slow_impl
@@ -8407,7 +8407,7 @@ class TestRound13StreamTimeoutE2E:
     @pytest.mark.asyncio
     async def test_e2e_stream_timeout_emits_error_on_hang(self):
         """stream_timeout=0.05 且 _run_impl 挂起时，stream() 应在 0.05s 后 emit error。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -8443,8 +8443,8 @@ class TestRound13WsTimeoutE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_ws_stream_timeout_emits_error_on_hang(self):
-        from weave.event_bus import EventBus
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         bus = EventBus()
         weave = MagicMock()
@@ -8475,9 +8475,9 @@ class TestRound13TextPatternE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_text_pattern_stops_even_with_tool_calls(self):
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -8527,9 +8527,9 @@ class TestRound13OutputFallbackE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_output_falls_back_to_last_non_empty_assistant(self):
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -8607,7 +8607,7 @@ class TestRound14IdleTimeoutSourceUnit:
     def test_stream_source_uses_idle_timeout_per_event(self):
         """agent.stream() 应以 stream_timeout 为单次等待事件上限（逐事件重置计时）。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave.stream)
         assert "event = await asyncio.wait_for(anext(subscribe_gen), timeout=stream_timeout)" in source
@@ -8620,7 +8620,7 @@ class TestRound14IdleTimeoutSourceUnit:
     def test_stream_source_cancels_run_task_on_timeout(self):
         """空闲超时触发后应取消在途运行并 yield error 事件（exception=TimeoutError）。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave.stream)
         assert "if not _run_task.done():" in source
@@ -8635,7 +8635,7 @@ class TestRound14WsIdleTimeoutSourceUnit:
     def test_ws_source_uses_idle_timeout_per_event(self):
         """ws.py 应与 agent.stream() 一致：wait_for 应用于消费端 anext。"""
         import inspect
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         source = inspect.getsource(ws_agent_stream)
         assert "event = await asyncio.wait_for(anext(subscribe_gen), timeout=stream_timeout)" in source
@@ -8646,7 +8646,7 @@ class TestRound14WsIdleTimeoutSourceUnit:
     def test_ws_source_cancels_task_and_sends_error(self):
         """ws.py 空闲超时后应取消在途任务并向客户端推送 error 事件。"""
         import inspect
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         source = inspect.getsource(ws_agent_stream)
         assert "if not task.done():" in source
@@ -8682,7 +8682,7 @@ class TestRound14StreamTimeoutConfigUnit:
 
     def test_loop_config_stream_timeout_independent_of_other_timeouts(self):
         """stream_timeout 与 timeout / tool_timeout 相互独立、互不影响。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         config = LoopConfig(stream_timeout=2.5, timeout=8.0, tool_timeout=40.0)
         assert config.stream_timeout == 2.5
@@ -8700,7 +8700,7 @@ class TestRound14IterativeOutputUnit:
     def test_output_guard_reached_max_iterations_source(self):
         """run() 应包含 reached max_iterations 守卫（末条为 tool 且无可用文本时）。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert 'reached max_iterations={max_iter} without a final response' in source
@@ -8709,7 +8709,7 @@ class TestRound14IterativeOutputUnit:
     def test_output_fallback_still_preferred_over_guard(self):
         """存在可用文本时优先回退 final_output → last_assistant_content → 最后消息。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "output = final_output or last_assistant_content or messages[-1].content" in source
@@ -8721,7 +8721,7 @@ class TestRound14ScheduledIntervalUnit:
     @pytest.mark.asyncio
     async def test_wait_for_next_run_numeric_interval(self):
         """schedule="5" 应按 5s 间隔分片睡眠恰好 5 次（非忙循环）。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
         agent = MagicMock()
@@ -8735,7 +8735,7 @@ class TestRound14ScheduledIntervalUnit:
             sleep_calls.append(secs)
             now["t"] += secs
 
-        with patch("weave.loop.scheduled.time.time", side_effect=fake_time):
+        with patch("weave_agent_sdk.loop.scheduled.time.time", side_effect=fake_time):
             with patch("asyncio.sleep", new=fake_sleep):
                 await asyncio.wait_for(loop._wait_for_next_run(agent, "5"), timeout=2.0)
 
@@ -8745,7 +8745,7 @@ class TestRound14ScheduledIntervalUnit:
     @pytest.mark.asyncio
     async def test_wait_for_next_run_unparseable_falls_back_60s(self, caplog):
         """非数值且无法解析为 cron 的 schedule 应回退 60s 间隔并记录告警。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
         agent = MagicMock()
@@ -8759,9 +8759,9 @@ class TestRound14ScheduledIntervalUnit:
             sleep_calls.append(secs)
             now["t"] += secs
 
-        with patch("weave.loop.scheduled.time.time", side_effect=fake_time):
+        with patch("weave_agent_sdk.loop.scheduled.time.time", side_effect=fake_time):
             with patch("asyncio.sleep", new=fake_sleep):
-                with caplog.at_level(logging.WARNING, logger="weave.loop.scheduled"):
+                with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.loop.scheduled"):
                     await asyncio.wait_for(loop._wait_for_next_run(agent, "not-a-cron"), timeout=2.0)
 
         assert len(sleep_calls) == 60
@@ -8784,7 +8784,7 @@ class TestRound14StreamIdleTimeoutE2E:
         这是空闲超时与"整次运行总时长上限"的核心区别：总时长超过 stream_timeout，
         但事件持续流动（每次等待 < stream_timeout），计时逐事件重置。
         """
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -8816,7 +8816,7 @@ class TestRound14StreamIdleTimeoutE2E:
     @pytest.mark.asyncio
     async def test_e2e_idle_timeout_emits_error_on_no_events(self):
         """_run_impl 挂起（不产生任何事件）时，stream() 应在 stream_timeout 后 emit error。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -8852,8 +8852,8 @@ class TestRound14WsIdleTimeoutE2E:
     @pytest.mark.asyncio
     async def test_e2e_ws_idle_timeout_resets_per_event(self):
         """WS 运行持续 emit token（间隔 < stream_timeout）应正常完成，不触发 error。"""
-        from weave.event_bus import EventBus
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         bus = EventBus()
         weave = MagicMock()
@@ -8887,9 +8887,9 @@ class TestRound14IterativeOutputE2E:
     async def test_e2e_output_reached_max_iterations_guard(self):
         """耗尽迭代且所有 assistant 文本为空、末条为 tool 消息时，
         输出明确的 reached max_iterations 提示，而非 tool JSON / 空串。"""
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -8933,7 +8933,7 @@ class TestRound14ScheduledIntervalE2E:
     @pytest.mark.asyncio
     async def test_e2e_wait_for_next_run_numeric_interval_not_busy(self):
         """schedule="2" 应按 2s 间隔睡眠 2 次（1.0s 分片），而非 0 间隔忙循环。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
         agent = MagicMock()
@@ -8947,7 +8947,7 @@ class TestRound14ScheduledIntervalE2E:
             sleep_calls.append(secs)
             now["t"] += secs
 
-        with patch("weave.loop.scheduled.time.time", side_effect=fake_time):
+        with patch("weave_agent_sdk.loop.scheduled.time.time", side_effect=fake_time):
             with patch("asyncio.sleep", new=fake_sleep):
                 await asyncio.wait_for(loop._wait_for_next_run(agent, "2"), timeout=2.0)
 
@@ -9012,7 +9012,7 @@ class TestRound15StreamTimeoutSourceUnit:
     def test_stream_source_grace_period_still_loop_timeout(self):
         """stream() 中"收到 done/error 后等待后台任务收尾"的宽限时长仍用 loop.timeout。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave.stream)
         # 空闲超时用 stream_timeout，收尾宽限用 loop.timeout —— 两个语义各自独立
@@ -9022,7 +9022,7 @@ class TestRound15StreamTimeoutSourceUnit:
     def test_ws_source_default_disabled_plain_anext(self):
         """ws.py 未配置 stream_timeout（不启用）时，消费端走普通 anext 而非 wait_for。"""
         import inspect
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         source = inspect.getsource(ws_agent_stream)
         assert "has_timeout = isinstance(stream_timeout, (int, float)) and stream_timeout > 0" in source
@@ -9035,7 +9035,7 @@ class TestRound15TextPatternUnit:
 
     def test_matches_text_pattern_second_condition_matches(self):
         """多个 text_pattern 条件中仅第二个命中时，_matches_text_pattern 应返回 True。"""
-        from weave.loop.iterative import _matches_text_pattern
+        from weave_agent_sdk.loop.iterative import _matches_text_pattern
 
         conditions = [
             {"type": "text_pattern", "pattern": r"ANSWER:\s*\d+"},
@@ -9045,14 +9045,14 @@ class TestRound15TextPatternUnit:
 
     def test_matches_text_pattern_empty_content_no_match(self):
         """content 为空字符串时 _matches_text_pattern 应返回 False（不崩溃、不停止）。"""
-        from weave.loop.iterative import _matches_text_pattern
+        from weave_agent_sdk.loop.iterative import _matches_text_pattern
 
         conditions = [{"type": "text_pattern", "pattern": r"ANSWER"}]
         assert _matches_text_pattern("", conditions) is False
 
     def test_matches_text_pattern_non_text_condition_ignored(self):
         """非 text_pattern 类型的停止条件（如 no_tool_calls）应被忽略，不参与正则匹配。"""
-        from weave.loop.iterative import _matches_text_pattern
+        from weave_agent_sdk.loop.iterative import _matches_text_pattern
 
         conditions = [
             {"type": "no_tool_calls"},
@@ -9067,7 +9067,7 @@ class TestRound15ScheduledZeroIntervalUnit:
     @pytest.mark.asyncio
     async def test_wait_for_next_run_zero_whitespace_variant_falls_back_60s(self, caplog):
         """schedule=" 0 "（含空白）strip 后为 "0"，仍应回退 60s 间隔（60 次分片睡眠）。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
         agent = MagicMock()
@@ -9081,9 +9081,9 @@ class TestRound15ScheduledZeroIntervalUnit:
             sleep_calls.append(secs)
             now["t"] += secs
 
-        with patch("weave.loop.scheduled.time.time", side_effect=fake_time):
+        with patch("weave_agent_sdk.loop.scheduled.time.time", side_effect=fake_time):
             with patch("asyncio.sleep", new=fake_sleep):
-                with caplog.at_level(logging.WARNING, logger="weave.loop.scheduled"):
+                with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.loop.scheduled"):
                     await asyncio.wait_for(loop._wait_for_next_run(agent, " 0 "), timeout=2.0)
 
         assert len(sleep_calls) == 60
@@ -9093,7 +9093,7 @@ class TestRound15ScheduledZeroIntervalUnit:
     @pytest.mark.asyncio
     async def test_wait_for_next_run_zero_leading_zeros_falls_back_60s(self, caplog):
         """schedule="00"（前导零）解析为 0 间隔，仍应回退 60s 防忙循环。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
         agent = MagicMock()
@@ -9107,9 +9107,9 @@ class TestRound15ScheduledZeroIntervalUnit:
             sleep_calls.append(secs)
             now["t"] += secs
 
-        with patch("weave.loop.scheduled.time.time", side_effect=fake_time):
+        with patch("weave_agent_sdk.loop.scheduled.time.time", side_effect=fake_time):
             with patch("asyncio.sleep", new=fake_sleep):
-                with caplog.at_level(logging.WARNING, logger="weave.loop.scheduled"):
+                with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.loop.scheduled"):
                     await asyncio.wait_for(loop._wait_for_next_run(agent, "00"), timeout=2.0)
 
         assert len(sleep_calls) == 60
@@ -9119,7 +9119,7 @@ class TestRound15ScheduledZeroIntervalUnit:
     @pytest.mark.asyncio
     async def test_wait_for_next_run_negative_number_falls_back_60s(self, caplog):
         """schedule="-5"（负数，非 isdigit）无法解析为 cron，应回退 60s 并记录 cannot parse 告警。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         loop = ScheduledLoop()
         agent = MagicMock()
@@ -9133,9 +9133,9 @@ class TestRound15ScheduledZeroIntervalUnit:
             sleep_calls.append(secs)
             now["t"] += secs
 
-        with patch("weave.loop.scheduled.time.time", side_effect=fake_time):
+        with patch("weave_agent_sdk.loop.scheduled.time.time", side_effect=fake_time):
             with patch("asyncio.sleep", new=fake_sleep):
-                with caplog.at_level(logging.WARNING, logger="weave.loop.scheduled"):
+                with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.loop.scheduled"):
                     await asyncio.wait_for(loop._wait_for_next_run(agent, "-5"), timeout=2.0)
 
         assert len(sleep_calls) == 60
@@ -9155,7 +9155,7 @@ class TestRound15StreamTimeoutE2E:
     async def test_e2e_stream_timeout_config_full_chain(self, tmp_path):
         """YAML 配置 stream_timeout → load_config → stream() 挂起运行在超时后 emit error。"""
         import yaml
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         yaml_path = tmp_path / "r15_stream_timeout.yaml"
         config_data = {
@@ -9205,8 +9205,8 @@ class TestRound15WsTimeoutE2E:
     @pytest.mark.asyncio
     async def test_e2e_ws_default_timeout_slow_run_not_killed(self):
         """WS 路径 stream_timeout=None（默认）时，运行耗时超过 loop.timeout 仍应收到 done 而非 error。"""
-        from weave.event_bus import EventBus
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         bus = EventBus()
         weave = MagicMock()
@@ -9239,9 +9239,9 @@ class TestRound15TextPatternE2E:
     @pytest.mark.asyncio
     async def test_e2e_text_pattern_no_match_with_tool_calls_continues(self):
         """LLM 返回未命中 text_pattern 的文本 + tool_calls → 不停止，tool 正常执行、循环继续。"""
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -9299,9 +9299,9 @@ class TestRound15OutputFallbackE2E:
     @pytest.mark.asyncio
     async def test_e2e_output_falls_back_to_latest_nonempty_assistant(self):
         """耗尽迭代时 output 统一为"未收敛"标记，不再回退到最近一轮 assistant 文本。"""
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -9349,8 +9349,8 @@ class TestRound15ScheduledZeroIntervalE2E:
     @pytest.mark.asyncio
     async def test_e2e_scheduled_zero_interval_run_falls_back_60s(self):
         from types import SimpleNamespace
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = SimpleNamespace(
             _config=SimpleNamespace(loop=SimpleNamespace(schedule="0")),
@@ -9378,7 +9378,7 @@ class TestRound15ScheduledZeroIntervalE2E:
 
         loop._execute_once = fake_execute_once
 
-        with patch("weave.loop.scheduled.time.time", side_effect=fake_time):
+        with patch("weave_agent_sdk.loop.scheduled.time.time", side_effect=fake_time):
             with patch("asyncio.sleep", new=fake_sleep):
                 result = await asyncio.wait_for(loop.run(agent, "hi"), timeout=5.0)
 
@@ -9407,7 +9407,7 @@ class TestRound16LlInFlightUnit:
 
     def test_llm_call_in_flight_helper_reads_instance_dict(self):
         """_llm_call_in_flight 应从实例 __dict__ 读取，MagicMock 不自动创建属性导致误判。"""
-        from weave.loop.base import _llm_call_in_flight
+        from weave_agent_sdk.loop.base import _llm_call_in_flight
 
         agent = MagicMock()
         # 未设置 → False（不能因 MagicMock 属性自动创建而误判为在途）
@@ -9426,8 +9426,8 @@ class TestRound16LlInFlightUnit:
         这是"非流式调用在途视为活动"的基础：call_llm 在非流式 chat 期间置标记，
         使消费端空闲超时能据此重置计时，避免 tool 型流程健康慢速调用被误杀。
         """
-        from weave.loop.base import call_llm, _llm_call_in_flight
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.base import call_llm, _llm_call_in_flight
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config.llm.max_tokens = 100
@@ -9451,8 +9451,8 @@ class TestRound16LlInFlightUnit:
     def test_stream_and_ws_source_treat_in_flight_as_active_on_idle_timeout(self):
         """agent.stream() 与 ws_agent_stream 空闲超时分支应先检查在途标记，在途 → continue。"""
         import inspect
-        from weave.agent import Weave
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         stream_src = inspect.getsource(Weave.stream)
         # 空闲超时分支：先检查非流式 LLM 调用是否在途，在途视为"活动"→ continue 重置计时
@@ -9472,8 +9472,8 @@ class TestRound16DelayedUserUnit:
     def test_simple_and_scheduled_delay_user_message_until_llm_reply(self):
         """simple/scheduled 的 persist_user_message 应位于 call_llm 之后（成功获得回复后才落盘）。"""
         import inspect
-        from weave.loop.simple import SimpleLoop
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.simple import SimpleLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         simple_src = inspect.getsource(SimpleLoop.run)
         simple_call = simple_src.index("response = await call_llm")
@@ -9488,7 +9488,7 @@ class TestRound16DelayedUserUnit:
     def test_iterative_delays_and_persists_user_once(self):
         """iterative 由 user_persisted 标志保证仅首次成功回复后落盘一次。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         call_idx = source.index("response = await call_llm")
@@ -9506,7 +9506,7 @@ class TestRound16DocsUnit:
         """types.py LoopConfig docstring 与 weave.yaml 注释应明确"空闲超时"语义，
         而非"整次运行总时长上限"。"""
         import inspect
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         src = inspect.getsource(LoopConfig)
         assert "空闲超时" in src
@@ -9523,8 +9523,8 @@ class TestRound16ReinjectUnit:
 
     def test_reinjected_messages_respect_budget(self):
         """_format_reinjected_messages 仅保留最近 limit 条（预算约束），防止 system prompt 单调膨胀。"""
-        from weave.loop.iterative import _format_reinjected_messages
-        from weave.types import Message, ToolCall
+        from weave_agent_sdk.loop.iterative import _format_reinjected_messages
+        from weave_agent_sdk.types import Message, ToolCall
 
         removed = [
             Message(role="assistant", content=f"a{i}",
@@ -9546,8 +9546,8 @@ class TestRound16ReinjectUnit:
 
     def test_reinjected_messages_preserve_tool_calls_summary(self):
         """assistant 条目 content 末尾附带 tool_calls 摘要；空 content 以摘要为正文；tool 消息原样保留。"""
-        from weave.loop.iterative import _format_reinjected_messages
-        from weave.types import Message, ToolCall
+        from weave_agent_sdk.loop.iterative import _format_reinjected_messages
+        from weave_agent_sdk.types import Message, ToolCall
 
         m1 = Message(role="assistant", content="thinking...",
                      tool_calls=[ToolCall(id="c1", name="search", arguments={"q": "x"}),
@@ -9576,9 +9576,9 @@ class TestRound16ExhaustedUnit:
     async def test_iterative_run_exhausted_output_unconverged_marker(self):
         """耗尽迭代（每轮均有非空 assistant 文本 + tool_calls）时，输出为"未收敛"标记，
         不再静默回退到数轮前的陈旧 assistant 文本（修复前行为）。"""
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -9620,8 +9620,8 @@ class TestRound16ExhaustedUnit:
     @pytest.mark.asyncio
     async def test_iterative_run_converged_output_not_marker(self):
         """命中 no_tool_calls 停止条件时正常输出模型文本，不误用"未收敛"标记。"""
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -9664,7 +9664,7 @@ class TestRound16LlInFlightE2E:
         非流式 LLM 调用（含 tools）期间零事件产出且耗时 > stream_timeout：
         若修复缺失，空闲超时会取消在途调用并 emit error；修复后应完成 emit done。
         """
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -9692,9 +9692,9 @@ class TestRound16LlInFlightE2E:
         weave._tools = [search_tool]
         weave._tool_map = {"search_tool": search_tool}
 
-        from weave.loop.iterative import IterativeLoop
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         loop = IterativeLoop()
         loop.on_start = AsyncMock()
@@ -9737,7 +9737,7 @@ class TestRound16LlInFlightE2E:
     @pytest.mark.asyncio
     async def test_e2e_ws_idle_timeout_in_flight_llm_not_killed(self):
         """WS 路径同场景：非流式 LLM 调用在途时空闲超时不触发，客户端收到 done 而非 error。"""
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         weave = self._make_slow_tool_weave()
         ws = _FakeWS({"input": "hi"})
@@ -9756,8 +9756,8 @@ class TestRound16DelayedUserE2E:
     async def test_e2e_simple_loop_delayed_user_message_persisted_after_reply_only(self):
         """成功获得 assistant 回复后 user 消息落盘一次；LLM 调用失败时 user 消息不落盘
         （避免"有 user 无 assistant"悬空消息污染后续记忆注入）。"""
-        from weave.loop.simple import SimpleLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.simple import SimpleLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         # ── 成功路径：回复后 user 落盘一次 ──
         agent_ok = MagicMock()
@@ -9818,9 +9818,9 @@ class TestRound16ExhaustedE2E:
     async def test_e2e_stream_done_event_output_unconverged_when_exhausted(self):
         """stream()+iterative 耗尽迭代（每轮均 tool_calls）时，done 事件 output 为
         "未收敛"标记，不再回退陈旧 assistant 文本。"""
-        from weave.event_bus import EventBus
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -9848,7 +9848,7 @@ class TestRound16ExhaustedE2E:
         weave._tools = [echo_tool]
         weave._tool_map = {"echo_tool": echo_tool}
 
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
         loop = IterativeLoop()
         loop.on_start = AsyncMock()
         loop.on_end = AsyncMock()
@@ -9881,9 +9881,9 @@ class TestRound16ReinjectE2E:
     async def test_e2e_iterative_long_tool_chain_reinjects_with_tool_calls_summary(self):
         """12 轮 tool 链触发窗口裁剪后，被裁剪的早期消息重新注入 system prompt，
         且 assistant 条目附带 tool_calls 摘要（模型仍能看到完整工具链参数）。"""
-        from weave.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop, _MAX_CONTEXT_MESSAGES
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -9917,7 +9917,7 @@ class TestRound16ReinjectE2E:
                 )
             return LLMResponse(content="final answer", model="test", tool_calls=None)
 
-        with patch("weave.loop.iterative.call_llm", side_effect=fake_call_llm):
+        with patch("weave_agent_sdk.loop.iterative.call_llm", side_effect=fake_call_llm):
             loop = IterativeLoop()
             loop.on_start = AsyncMock()
             loop.on_end = AsyncMock()
@@ -9965,7 +9965,7 @@ class TestRound1EagerSubscribeUnit:
 
         修复前：队列创建与注册延迟到首次 anext()，后台任务先 emit 时 error 被丢弃。
         """
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen = bus.subscribe("token", "tool_call", "tool_result", "done", "error")
@@ -9987,7 +9987,7 @@ class TestRound1EagerSubscribeUnit:
     def test_stream_subscribes_before_task_creation(self):
         """stream() 源码中订阅（subscribe_gen）应位于后台任务（_run_task）创建之前。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave.stream)
         subscribe_idx = source.index("subscribe_gen = self._event_bus.subscribe(")
@@ -10082,7 +10082,7 @@ class TestRound1ConfigIdleDocUnit:
     def test_config_stream_timeout_comment_idle_semantics(self):
         """config.py 中 stream_timeout 注释应明确"空闲超时"语义，而非"整体超时"。"""
         import inspect
-        from weave import config
+        from weave_agent_sdk import config
 
         source = inspect.getsource(config)
         assert "空闲超时" in source
@@ -10093,7 +10093,7 @@ class TestRound1ConfigIdleDocUnit:
     def test_types_and_yaml_stream_timeout_docs_idle_semantics(self):
         """types.py LoopConfig 文档与 weave.yaml 注释应统一为"空闲超时"语义。"""
         import inspect
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         src = inspect.getsource(LoopConfig)
         assert "空闲超时" in src
@@ -10111,7 +10111,7 @@ class TestRound1ScheduledRestartUnit:
     def test_scheduled_run_resets_shutting_down_flag(self):
         """scheduled.py run() 启动时应复位 _shutting_down，允许 shutdown 后重新启动。"""
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop.run)
         assert "self._shutting_down = False" in source
@@ -10120,9 +10120,9 @@ class TestRound1ScheduledRestartUnit:
     async def test_scheduled_restart_resets_flag_and_executes(self):
         """handle_shutdown() 后同一实例重新 run() 应复位标志并正常执行，而非静默 no-op。"""
         from types import SimpleNamespace
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = SimpleNamespace(
             _config=SimpleNamespace(loop=SimpleNamespace(
@@ -10163,7 +10163,7 @@ class TestRound1RemovedMessagesUnit:
     def test_removed_messages_budget_clip_in_source(self):
         """iterative.py run() 应对 removed_messages 做预算裁剪，防止长 tool 链内存无界增长。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "if len(removed_messages) > reinject_limit:" in source
@@ -10171,8 +10171,8 @@ class TestRound1RemovedMessagesUnit:
 
     def test_format_reinjected_messages_bounded_by_limit(self):
         """_format_reinjected_messages 只格式化最近 limit 条被裁消息（有界重注入）。"""
-        from weave.loop.iterative import _format_reinjected_messages
-        from weave.types import Message
+        from weave_agent_sdk.loop.iterative import _format_reinjected_messages
+        from weave_agent_sdk.types import Message
 
         removed = [Message(role="assistant", content=f"msg{i}") for i in range(50)]
         result = _format_reinjected_messages(removed, 5)
@@ -10193,7 +10193,7 @@ class TestRound1StreamSyncErrorE2E:
     @pytest.mark.asyncio
     async def test_e2e_stream_sync_failure_error_delivered(self):
         """stream() 在首个调度槽内同步失败时，消费者仍收到 error 事件（订阅先于任务创建）。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -10315,9 +10315,9 @@ class TestRound1ScheduledRestartE2E:
     async def test_e2e_scheduled_loop_restart_after_shutdown(self):
         """完整生命周期：shutdown 后同一实例重新 run() 应复位标志并继续执行触发。"""
         from types import SimpleNamespace
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         def make_agent():
             return SimpleNamespace(
@@ -10371,12 +10371,12 @@ class TestRound1RemovedMessagesE2E:
     @pytest.mark.asyncio
     async def test_e2e_long_tool_chain_removed_messages_bounded(self):
         """30 轮 tool 链：每次重注入前 removed_messages 长度恒 ≤ memory_context_limit。"""
-        from weave.loop.iterative import (
+        from weave_agent_sdk.loop.iterative import (
             IterativeLoop,
             _format_reinjected_messages,
         )
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -10417,8 +10417,8 @@ class TestRound1RemovedMessagesE2E:
             reinject_lens.append(len(removed))
             return real_fn(removed, limit)
 
-        with patch("weave.loop.iterative._format_reinjected_messages", side_effect=spy):
-            with patch("weave.loop.iterative.call_llm", side_effect=fake_call_llm):
+        with patch("weave_agent_sdk.loop.iterative._format_reinjected_messages", side_effect=spy):
+            with patch("weave_agent_sdk.loop.iterative.call_llm", side_effect=fake_call_llm):
                 loop = IterativeLoop()
                 loop.on_start = AsyncMock()
                 loop.on_end = AsyncMock()
@@ -10459,7 +10459,7 @@ class TestRound2EagerSubscribeUnit:
         错误事件被丢弃（消费者永久挂起）。修复后 subscribe() 调用时即
         完成注册，早期 emit 事件立即可见。
         """
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen = bus.subscribe("token", "done")
@@ -10486,7 +10486,7 @@ class TestRound2EagerSubscribeUnit:
         每个订阅者调用 subscribe() 时都急切注册；aclose() 只清理自己的队列，
         直到最后一个订阅者退订后才移除该事件类型。
         """
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen1 = bus.subscribe("token")
@@ -10609,7 +10609,7 @@ class TestRound2ConfigIdleDocUnit:
         stream_timeout 是"空闲超时"，不是整次运行总时长上限；默认 None 不启用。
         """
         import inspect
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         src = inspect.getsource(LoopConfig)
         assert "宽限时长" in src            # timeout 语义：后台任务收尾宽限
@@ -10631,8 +10631,8 @@ class TestRound2ScheduledRestartUnit:
         复位只属于常驻调度路径（run() 启动时）。单次执行直接走 _execute_once
         返回，不触碰标志——语义上单次执行无"重启"概念。
         """
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         agent = MagicMock()
         agent._config.loop.schedule = None   # 单次执行路径
@@ -10657,7 +10657,7 @@ class TestRound2ScheduledRestartUnit:
         必须位于主循环之前。
         """
         import inspect
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         source = inspect.getsource(ScheduledLoop.run)
         assert "self._current_task = asyncio.current_task()" in source
@@ -10678,8 +10678,8 @@ class TestRound2RemovedMessagesUnit:
         修复项5 核心：只保留最近 reinject_limit 条（重注入也只取最近 limit 条），
         在不变更重注入语义的前提下把内存约束为常数预算。
         """
-        from weave.loop.iterative import _format_reinjected_messages
-        from weave.types import Message
+        from weave_agent_sdk.loop.iterative import _format_reinjected_messages
+        from weave_agent_sdk.types import Message
 
         removed = [Message(role="assistant", content=f"m{i}") for i in range(30)]
         limit = 5
@@ -10701,7 +10701,7 @@ class TestRound2RemovedMessagesUnit:
         负切片 / 空切片，破坏有界性保证。
         """
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert 'reinject_limit = getattr(config, "memory_context_limit", 20)' in source
@@ -10721,7 +10721,7 @@ class TestRound2StreamSyncErrorE2E:
     async def test_e2e_sync_failure_twice_no_subscriber_leak(self):
         """连续两次同步失败（_load_system_prompt 抛 ValueError）都应收到 error 事件，
         且每次流结束订阅都被清理（subscriber_count 归零，无注册泄漏）。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -10851,9 +10851,9 @@ class TestRound2ScheduledRestartE2E:
         """完整生命周期：shutdown → run → shutdown → run 两个周期，
         每个周期都正常执行触发（run 编号递增），且重启前 _executing 已复位。"""
         from types import SimpleNamespace
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         def make_agent():
             return SimpleNamespace(
@@ -10906,9 +10906,9 @@ class TestRound2RemovedMessagesE2E:
     async def test_e2e_removed_messages_bounded_with_small_limit(self):
         """25 轮 tool 链 + memory_context_limit=5：每次重注入前 removed_messages
         长度恒 ≤ 5（小预算强调有界性），重注入仍携带 tool_calls 摘要。"""
-        from weave.loop.iterative import IterativeLoop, _format_reinjected_messages
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop, _format_reinjected_messages
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -10949,8 +10949,8 @@ class TestRound2RemovedMessagesE2E:
             reinject_lens.append(len(removed))
             return real_fn(removed, limit)
 
-        with patch("weave.loop.iterative._format_reinjected_messages", side_effect=spy):
-            with patch("weave.loop.iterative.call_llm", side_effect=fake_call_llm):
+        with patch("weave_agent_sdk.loop.iterative._format_reinjected_messages", side_effect=spy):
+            with patch("weave_agent_sdk.loop.iterative.call_llm", side_effect=fake_call_llm):
                 loop = IterativeLoop()
                 loop.on_start = AsyncMock()
                 loop.on_end = AsyncMock()
@@ -10986,7 +10986,7 @@ class TestRound3EagerSubscribeUnit:
     async def test_subscribe_mixed_event_types_cleanup_all(self):
         """单个订阅者跨多种事件类型：subscribe() 调用时全部急切注册，
         aclose() 时全部退订清理（每种事件类型都不残留）。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen = bus.subscribe("token", "tool_call", "done")
@@ -11008,7 +11008,7 @@ class TestRound3EagerSubscribeUnit:
     @pytest.mark.asyncio
     async def test_emit_with_no_subscriber_safe_noop(self):
         """无订阅者时 emit 应是安全的 no-op（不抛异常、不残留队列）。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         await bus.emit("done", {"output": "x", "elapsed_ms": 0, "iterations": 1})
@@ -11113,14 +11113,14 @@ class TestRound3ConfigIdleDocUnit:
 
         # stream() 以 >0 判断是否启用：0 不启用
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
         source = inspect.getsource(Weave.stream)
         assert "has_timeout = isinstance(stream_timeout, (int, float)) and stream_timeout > 0" in source
 
     def test_types_stream_timeout_field_default_and_annotation(self):
         """LoopConfig.stream_timeout 类型为 float|None、默认 None（不启用），
         与 timeout（宽限 5.0）在字段层面即分离。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         config = LoopConfig()
         assert config.stream_timeout is None
@@ -11137,7 +11137,7 @@ class TestRound3ScheduledRestartUnit:
     async def test_execute_once_resets_executing_flag_on_error(self):
         """_execute_once 抛异常（LLM 调用失败）时，_executing 在 finally 中复位为 False，
         避免重启后把新触发误判为"执行中"（影响 handle_shutdown 的分支选择）。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -11167,9 +11167,9 @@ class TestRound3ScheduledRestartUnit:
         """shutdown 后同一实例重新 run()：_current_task 由新任务接管（非复用旧任务），
         且 _executing 复位为 False。"""
         from types import SimpleNamespace
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.types import LoopResult
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.types import LoopResult
 
         def make_agent():
             return SimpleNamespace(
@@ -11216,7 +11216,7 @@ class TestRound3RemovedMessagesUnit:
         """removed_messages 只累积被裁掉的 assistant/tool 消息（messages[2:start]），
         system+user（messages[0]/messages[1]）恒保留在窗口内，绝不进入 removed_messages。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "trimmed = [messages[0], messages[1]] + messages[-(_MAX_CONTEXT_MESSAGES - 2):]" in source
@@ -11227,8 +11227,8 @@ class TestRound3RemovedMessagesUnit:
     def test_format_reinjected_boundary_limit(self):
         """重注入条数在边界（limit==len / limit==len-1）时行为正确：
         limit 等于列表长度全量保留；limit 少一条时只丢弃最旧一条、顺序不变。"""
-        from weave.loop.iterative import _format_reinjected_messages
-        from weave.types import Message
+        from weave_agent_sdk.loop.iterative import _format_reinjected_messages
+        from weave_agent_sdk.types import Message
 
         removed = [Message(role="assistant", content=f"m{i}") for i in range(5)]
 
@@ -11253,7 +11253,7 @@ class TestRound3StreamSyncErrorE2E:
     async def test_e2e_subscription_registered_before_task_creation(self):
         """在 _run_and_emit 任务创建的时刻，5 种契约事件类型都已被急切注册——
         直接验证"先订阅后建任务"（同步失败 error 不丢的根因）。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -11277,7 +11277,7 @@ class TestRound3StreamSyncErrorE2E:
             recorded["subscriber_count"] = dict(weave._event_bus.subscriber_count)
             return orig_create_task(coro, *a, **k)
 
-        with patch("weave.agent.asyncio.create_task", side_effect=spy_create):
+        with patch("weave_agent_sdk.agent.asyncio.create_task", side_effect=spy_create):
             events = []
             async for event in weave.stream("input"):
                 events.append(event)
@@ -11330,7 +11330,7 @@ class TestRound3ConfigIdleTimeoutE2E:
     @pytest.mark.asyncio
     async def test_e2e_stream_timeout_zero_disabled_slow_run_completes(self, tmp_path):
         import yaml
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         yaml_path = tmp_path / "r3_zero_stream_timeout.yaml"
         config_data = {
@@ -11375,9 +11375,9 @@ class TestRound3ScheduledRestartE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_weave_level_scheduled_restart_after_shutdown(self):
-        from weave.event_bus import EventBus
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.event_bus import EventBus
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -11452,9 +11452,9 @@ class TestRound3RemovedMessagesE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_long_tool_chain_removed_bounded_and_window_preserved(self):
-        from weave.loop.iterative import IterativeLoop, _format_reinjected_messages
-        from weave.llm.base import LLMResponse
-        from weave.types import ToolCall
+        from weave_agent_sdk.loop.iterative import IterativeLoop, _format_reinjected_messages
+        from weave_agent_sdk.llm.base import LLMResponse
+        from weave_agent_sdk.types import ToolCall
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -11496,8 +11496,8 @@ class TestRound3RemovedMessagesE2E:
             reinject_lens.append(len(removed))
             return real_fn(removed, limit)
 
-        with patch("weave.loop.iterative._format_reinjected_messages", side_effect=spy):
-            with patch("weave.loop.iterative.call_llm", side_effect=fake_call_llm):
+        with patch("weave_agent_sdk.loop.iterative._format_reinjected_messages", side_effect=spy):
+            with patch("weave_agent_sdk.loop.iterative.call_llm", side_effect=fake_call_llm):
                 loop = IterativeLoop()
                 loop.on_start = AsyncMock()
                 loop.on_end = AsyncMock()
@@ -11541,12 +11541,12 @@ class TestRound4BakCleanupUnit:
 
     def test_weave_config_py_bak_removed(self):
         """weave/config.py.bak 应已删除（weave/ 内 7 个 .bak 之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "config.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "config.py.bak").exists(), \
             "weave/config.py.bak 应已清理"
 
     def test_weave_types_py_bak_removed(self):
         """weave/types.py.bak 应已删除（weave/ 内 7 个 .bak 之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "types.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "types.py.bak").exists(), \
             "weave/types.py.bak 应已清理"
 
     def test_weave_yaml_bak_removed(self):
@@ -11561,7 +11561,7 @@ class TestRound4BakCleanupUnit:
 
     def test_no_bak_in_weave_package_root(self):
         """weave/ 顶层目录不应存在任何 .bak 文件。"""
-        weave_dir = self.PROJECT_ROOT / "weave"
+        weave_dir = self.PROJECT_ROOT / "weave_agent_sdk"
         bak_files = [p.name for p in weave_dir.iterdir() if p.name.endswith(".bak")]
         assert bak_files == [], f"weave/ 顶层残留 .bak: {bak_files}"
 
@@ -11605,7 +11605,7 @@ class TestRound4BakCleanupE2E:
 
     def test_e2e_no_bak_anywhere_in_weave_source_tree(self):
         """weave/ 源码整棵树递归扫描不应存在任何 .bak 文件（含全部子目录）。"""
-        weave_dir = self.PROJECT_ROOT / "weave"
+        weave_dir = self.PROJECT_ROOT / "weave_agent_sdk"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in weave_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/ 源码树残留 .bak: {bak_files}"
 
@@ -11617,8 +11617,8 @@ class TestRound4BakCleanupE2E:
     def test_e2e_cleaned_bak_files_absent_anywhere(self):
         """本轮清理的 9 个 .bak 文件应全部从项目中消失（按已知路径 + 全量计数验证）。"""
         known_paths = [
-            self.PROJECT_ROOT / "weave" / "config.py.bak",
-            self.PROJECT_ROOT / "weave" / "types.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "config.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "types.py.bak",
             self.PROJECT_ROOT / "weave.yaml.bak",
             self.PROJECT_ROOT / "nexus" / "review_record.md.bak",
         ]
@@ -11664,7 +11664,7 @@ class TestRound5JsonExtractR2Unit:
         仅承载结构化错误数据（raw_preview），反馈 Prompt 由调用方从 .md 加载。
         """
         import inspect
-        import weave.utils.json_extract as je
+        import weave_agent_sdk.utils.json_extract as je
 
         source = inspect.getsource(je)
         assert "to_feedback" not in source, "json_extract.py 不应再包含 to_feedback()"
@@ -11676,7 +11676,7 @@ class TestRound5JsonExtractR2Unit:
 
     def test_json_extract_error_carries_only_structured_data(self):
         """JsonExtractError 仅承载结构化错误数据（message 在 args、raw_preview 独立字段），无 Prompt。"""
-        from weave.utils.json_extract import JsonExtractError
+        from weave_agent_sdk.utils.json_extract import JsonExtractError
 
         err = JsonExtractError("No JSON found", raw_preview="raw...")
         assert err.args[0] == "No JSON found"
@@ -11686,7 +11686,7 @@ class TestRound5JsonExtractR2Unit:
     def test_structured_call_uses_feature_prompt_for_invalid_json(self):
         """structured_call.py 对无效 JSON 的反馈应从 feature_prompt 加载，而非硬编码（R2）。"""
         import inspect
-        from weave.features.structured_call import structured_call
+        from weave_agent_sdk.features.structured_call import structured_call
 
         source = inspect.getsource(structured_call)
         assert 'feature_prompt("structured_call_invalid", error=last_error)' in source
@@ -11700,7 +11700,7 @@ class TestRound5MessagesWindowUnit:
     def test_load_config_clamps_messages_window_to_three(self, tmp_path):
         """YAML 配置 messages_window < 3 时，load_config 应钳制为 3。"""
         import yaml
-        from weave.config import load_config
+        from weave_agent_sdk.config import load_config
 
         for raw in (1, 2, 0, -5):
             yaml_path = tmp_path / f"r5_ms_win_{raw}.yaml"
@@ -11723,7 +11723,7 @@ class TestRound5MessagesWindowUnit:
     def test_load_config_keeps_messages_window_above_three(self, tmp_path):
         """YAML 配置 messages_window >= 3 时应原样保留（如 5 / 20）。"""
         import yaml
-        from weave.config import load_config
+        from weave_agent_sdk.config import load_config
 
         for raw in (3, 5, 20, 100):
             yaml_path = tmp_path / f"r5_ms_win_ok_{raw}.yaml"
@@ -11745,7 +11745,7 @@ class TestRound5MessagesWindowUnit:
     def test_iterative_uses_configured_window_only_when_ge_three(self):
         """iterative.py 仅在配置窗口 >= 3 时采用，否则回退模块级默认 20。"""
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "isinstance(configured_window, int) and configured_window >= 3" in source
@@ -11757,7 +11757,7 @@ class TestRound5FeaturePromptUnit:
 
     def test_feature_prompt_loads_and_interpolates(self):
         """feature_prompt 应从 prompts/features/{name}.md 加载并做变量插值。"""
-        from weave.features._prompts import feature_prompt, FEATURE_PROMPTS_DIR
+        from weave_agent_sdk.features._prompts import feature_prompt, FEATURE_PROMPTS_DIR
 
         # 路径集中定义（DRY），指向 prompts/features 子目录
         assert FEATURE_PROMPTS_DIR == Path("prompts") / "features"
@@ -11768,7 +11768,7 @@ class TestRound5FeaturePromptUnit:
 
     def test_feature_prompt_missing_file_friendly_hint(self, tmp_path, monkeypatch):
         """模板文件缺失时抛出友好 FileNotFoundError，包含路径与创建引导。"""
-        import weave.features._prompts as fp
+        import weave_agent_sdk.features._prompts as fp
 
         # 将 FEATURE_PROMPTS_DIR 指向一个不存在该模板的临时目录
         fake_dir = tmp_path / "prompts" / "features"
@@ -11783,7 +11783,7 @@ class TestRound5FeaturePromptUnit:
 
     def test_feature_prompt_raw_loads_without_interpolation(self):
         """feature_prompt_raw 返回原始模板，不做变量替换。"""
-        from weave.features._prompts import feature_prompt_raw
+        from weave_agent_sdk.features._prompts import feature_prompt_raw
 
         raw = feature_prompt_raw("structured_call_invalid")
         assert "{{ error }}" in raw
@@ -11794,12 +11794,12 @@ class TestRound5SchemaFeedbackUnit:
     """第5轮修复项4（_schema_feedback 模板行数解耦）—— 单元测试。"""
 
     def _call_with_template(self, template: str):
-        from weave.features.structured_call import _schema_feedback
-        from weave.features.schema_validation import ValidationError
+        from weave_agent_sdk.features.structured_call import _schema_feedback
+        from weave_agent_sdk.features.schema_validation import ValidationError
         from unittest.mock import patch
 
         err = ValidationError(missing=["name"], type_errors={"age": "bad"}, extra=["extra_field"])
-        with patch("weave.features.structured_call.feature_prompt", return_value=template):
+        with patch("weave_agent_sdk.features.structured_call.feature_prompt", return_value=template):
             return _schema_feedback(err)
 
     def test_schema_feedback_header_is_first_line_fix_is_last(self):
@@ -11838,8 +11838,8 @@ class TestRound5SchemaFeedbackUnit:
 
     def test_schema_feedback_missing_label_skips_category_with_warning(self, caplog):
         """某类别标签缺失时应跳过该类反馈并记录 warning，不崩溃不错位。"""
-        from weave.features.structured_call import _schema_feedback
-        from weave.features.schema_validation import ValidationError
+        from weave_agent_sdk.features.structured_call import _schema_feedback
+        from weave_agent_sdk.features.schema_validation import ValidationError
         from unittest.mock import patch
 
         template = (
@@ -11848,7 +11848,7 @@ class TestRound5SchemaFeedbackUnit:
             "Final fix instruction"
         )
         err = ValidationError(missing=["name"], type_errors={"age": "bad"}, extra=["x"])
-        with patch("weave.features.structured_call.feature_prompt", return_value=template):
+        with patch("weave_agent_sdk.features.structured_call.feature_prompt", return_value=template):
             with caplog.at_level(logging.WARNING):
                 last, fix = _schema_feedback(err)
 
@@ -11862,12 +11862,12 @@ class TestRound5SchemaFeedbackUnit:
 
     def test_schema_feedback_less_than_two_lines_raises(self):
         """模板不足 2 个非空行（无 header+修复指令）时应抛出 ValueError。"""
-        from weave.features.structured_call import _schema_feedback
-        from weave.features.schema_validation import ValidationError
+        from weave_agent_sdk.features.structured_call import _schema_feedback
+        from weave_agent_sdk.features.schema_validation import ValidationError
         from unittest.mock import patch
 
         err = ValidationError(missing=["name"])
-        with patch("weave.features.structured_call.feature_prompt", return_value="Only one line"):
+        with patch("weave_agent_sdk.features.structured_call.feature_prompt", return_value="Only one line"):
             with pytest.raises(ValueError) as excinfo:
                 _schema_feedback(err)
         assert "at least" in str(excinfo.value)
@@ -11899,7 +11899,7 @@ class TestRound5PromptSubdirUnit:
         prompts/system.md）；而应保留为 custom/system 相对名。
         """
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave._load_system_prompt)
         assert "Path(prompt_path).relative_to(Path(\"prompts\"))" in source
@@ -11921,7 +11921,7 @@ class TestRound5JsonExtractR2E2E:
 
     def test_e2e_structured_call_invalid_json_feedback_from_template(self):
         """structured_call 的无效 JSON 反馈应来自 prompts/features/structured_call_invalid.md。"""
-        from weave.features._prompts import feature_prompt
+        from weave_agent_sdk.features._prompts import feature_prompt
 
         rendered = feature_prompt("structured_call_invalid", error="my error msg")
         assert rendered == "Your JSON was invalid: my error msg. Please output ONLY valid JSON."
@@ -11932,8 +11932,8 @@ class TestRound5SchemaFeedbackE2E:
 
     def test_e2e_schema_feedback_with_real_template(self):
         """使用真实 structured_call_schema.md 时 header/fix/标签均正确。"""
-        from weave.features.structured_call import _schema_feedback
-        from weave.features.schema_validation import ValidationError
+        from weave_agent_sdk.features.structured_call import _schema_feedback
+        from weave_agent_sdk.features.schema_validation import ValidationError
 
         err = ValidationError(missing=["name"], type_errors={"age": "bad"}, extra=["x"])
         last, fix = _schema_feedback(err)
@@ -11951,7 +11951,7 @@ class TestRound5MessagesWindowE2E:
     def test_e2e_config_clamps_and_iterative_uses_clamped_window(self, tmp_path):
         """YAML 配置 messages_window=1 → load_config 钳制为 3，IterativeLoop 采用 3。"""
         import yaml
-        from weave.config import load_config
+        from weave_agent_sdk.config import load_config
 
         yaml_path = tmp_path / "r5_e2e_ms_win.yaml"
         config_data = {
@@ -11972,7 +11972,7 @@ class TestRound5MessagesWindowE2E:
 
         # IterativeLoop 读取该配置时使用钳制后的窗口
         import inspect
-        from weave.loop.iterative import IterativeLoop
+        from weave_agent_sdk.loop.iterative import IterativeLoop
 
         source = inspect.getsource(IterativeLoop.run)
         assert "configured_window >= 3" in source
@@ -11983,7 +11983,7 @@ class TestRound5FeaturePromptMissingE2E:
 
     def test_e2e_feature_prompt_missing_file_guidance(self, tmp_path, monkeypatch):
         """缺失模板的 FileNotFoundError 应给出可操作的创建引导（路径 + copy 指引）。"""
-        import weave.features._prompts as fp
+        import weave_agent_sdk.features._prompts as fp
 
         fake_dir = tmp_path / "prompts" / "features"
         monkeypatch.setattr(fp, "FEATURE_PROMPTS_DIR", fake_dir)
@@ -12002,8 +12002,8 @@ class TestRound5PromptSubdirE2E:
     def test_e2e_load_system_prompt_resolves_subdirectory_file(self, tmp_path, monkeypatch):
         """prompts/custom/system.md 应被解析为 custom/system 并从子目录加载内容。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
 
         # 构造临时 prompts/custom/system.md
         prompts_dir = tmp_path / "prompts"
@@ -12024,8 +12024,8 @@ class TestRound5PromptSubdirE2E:
     def test_e2e_root_prompt_still_resolves_as_system(self, tmp_path, monkeypatch):
         """prompts/system.md（根目录）仍应解析为 system，兼容既有行为。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
 
         prompts_dir = tmp_path / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
@@ -12065,7 +12065,7 @@ class TestRound6TTLUnit:
     def test_parse_memory_scopes_ttl_from_access_block_and_priority(self):
         """memory.scopes 中 ttl 写在 access 配置块内（如 session.stream.ttl）
         应被解析进 MemoryScopeConfig.ttl；scope 级 ttl 优先于 access 块内 ttl。"""
-        from weave.config import _parse_memory_scopes
+        from weave_agent_sdk.config import _parse_memory_scopes
 
         # access 块内 ttl（weave.yaml 默认示例形态）
         scopes = _parse_memory_scopes({
@@ -12087,8 +12087,8 @@ class TestRound6TTLUnit:
     def test_ttl_for_namespace_resolves_and_validates(self):
         """_ttl_for_namespace 应解析 scope 配置的 ttl 为 float；
         非数值 / 非正配置回退 None（永不过期）；无 scope 配置回退 None。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(ttl=3600),
@@ -12108,8 +12108,8 @@ class TestRound6TTLUnit:
     async def test_writes_set_expires_at_and_cleanup_on_write_path(self):
         """stream/state/knowledge 写入应按 scope ttl 计算 expires_at；
         过期条目在后续写入时被写路径被动清理（cleanup_expired）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(ttl=0.05),
@@ -12157,8 +12157,8 @@ class TestRound6StateNarrowOverWideUnit:
 
     def test_get_namespaces_priority_ascending_narrow_first(self):
         """get_namespaces("state") 应按 priority 升序返回（窄 scope 在前）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=10, state={"backend": "sqlite", "path": ":memory:"}),
@@ -12173,8 +12173,8 @@ class TestRound6StateNarrowOverWideUnit:
     @pytest.mark.asyncio
     async def test_state_get_all_narrow_overrides_wide_same_key(self):
         """同 key 时窄 scope 覆盖宽 scope：get_all 按宽→窄合并，窄值胜出。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=10, state={"backend": "sqlite", "path": ":memory:"}),
@@ -12200,7 +12200,7 @@ class TestRound6ToolTypeInferenceUnit:
         """Optional[int] / int | None（PEP 604）/ Union[...] 应解包为实际类型，
         而非退化为默认 "string"。"""
         from typing import Optional, Union
-        from weave.loop.iterative import _resolve_param_type
+        from weave_agent_sdk.loop.iterative import _resolve_param_type
 
         assert _resolve_param_type(Optional[int]) == "integer"
         assert _resolve_param_type(int | None) == "integer"
@@ -12212,7 +12212,7 @@ class TestRound6ToolTypeInferenceUnit:
         """list[str] / dict[str, Any] 等泛型别名应映射为 array / object，
         而非退化为默认 "string"。"""
         from typing import Any, Dict, List
-        from weave.loop.iterative import _resolve_param_type
+        from weave_agent_sdk.loop.iterative import _resolve_param_type
 
         assert _resolve_param_type(list[str]) == "array"
         assert _resolve_param_type(dict[str, Any]) == "object"
@@ -12228,7 +12228,7 @@ class TestRound6ToolTypeInferenceUnit:
         """_build_tool_schemas 对含 Optional / list / dict 参数的 tool
         生成正确的 JSON Schema（类型 / 必填 / 描述）。"""
         from typing import Any, Optional
-        from weave.loop.iterative import _build_tool_schemas
+        from weave_agent_sdk.loop.iterative import _build_tool_schemas
 
         def search(query, top_k=5, tags=None, meta=None):
             """Search the knowledge base."""
@@ -12267,8 +12267,8 @@ class TestRound6PromptAbsolutePathUnit:
         """_load_system_prompt 对绝对路径应直接加载真实文件内容，
         而非回退 PurePath.stem 经 registry 名称解析（会静默加载错误文件）。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
 
         prompt_file = tmp_path / "custom" / "prompts" / "system.md"
         prompt_file.parent.mkdir(parents=True, exist_ok=True)
@@ -12289,8 +12289,8 @@ class TestRound6ScheduledNoPhantomNsUnit:
     async def test_execute_once_skips_state_write_when_no_state_scope(self):
         """未激活任何 state namespace 时，_execute_once 不应写入
         "default:session:state" 幻影 namespace，且 memory_updated 不含 state。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -12350,7 +12350,7 @@ class TestRound6TTLE2E:
             encoding="utf-8",
         )
 
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         config = load_config(yaml_path)
         # 解析链：access 块内 ttl → MemoryScopeConfig.ttl
@@ -12408,7 +12408,7 @@ class TestRound6StateNarrowOverWideE2E:
             encoding="utf-8",
         )
 
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         config = load_config(yaml_path)
         manager = MemoryManager(config.memory)
@@ -12433,7 +12433,7 @@ class TestRound6ToolSchemaE2E:
     def test_e2e_tool_schema_full_with_generic_optional_params(self):
         """含 Optional / 泛型别名的 tool 应生成完整且正确的 LLM 工具 Schema。"""
         from typing import Any, Optional
-        from weave.loop.iterative import _build_tool_schemas
+        from weave_agent_sdk.loop.iterative import _build_tool_schemas
 
         def analyze(source, limit=10, filters=None, params=None):
             """Analyze the given source with optional filters."""
@@ -12471,8 +12471,8 @@ class TestRound6PromptAbsolutePathE2E:
         """绝对路径与"非 prompts/ 前缀"相对路径都应直接加载配置指向的文件，
         而非回退 registry 名称解析（避免静默加载错误文件）。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
 
         # ── 绝对路径 ──
         abs_file = tmp_path / "abs_prompts" / "system.md"
@@ -12505,10 +12505,10 @@ class TestRound6ScheduledNoPhantomNsE2E:
     async def test_e2e_scheduled_run_no_phantom_namespace_write(self):
         """真实 MemoryManager（未激活 scope，无任何 namespace）下 scheduled 单次执行：
         不应写入 default:session:state 幻影 ns（不创建任何 backend）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         manager = MemoryManager(MemoryConfig())
         agent = MagicMock()
@@ -12559,7 +12559,7 @@ class TestRound7CleanupExpiredFixUnit:
         sqlite3.OperationalError: near "LIMIT": syntax error，导致所有写路径崩溃。
         """
         import inspect
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         source = inspect.getsource(SQLiteBackend.cleanup_expired)
         assert "DELETE FROM memory_entries WHERE expires_at IS NOT NULL AND expires_at <= ? LIMIT ?" not in source, \
@@ -12568,7 +12568,7 @@ class TestRound7CleanupExpiredFixUnit:
     def test_cleanup_expired_source_select_ids_then_delete_by_id(self):
         """cleanup_expired() 应改为：先 SELECT 过期条目 id，再按 id DELETE。"""
         import inspect
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         source = inspect.getsource(SQLiteBackend.cleanup_expired)
         # 先查 id（SELECT 带 LIMIT 是安全的分批上限）
@@ -12588,7 +12588,7 @@ class TestRound7CleanupExpiredFixUnit:
         修复后写路径恢复并在每次写入时被动清理过期条目。
         """
         import inspect
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         src_stream = inspect.getsource(SQLiteBackend.stream_append)
         src_state = inspect.getsource(SQLiteBackend.state_set)
@@ -12601,7 +12601,7 @@ class TestRound7CleanupExpiredFixUnit:
 
     def test_cleanup_expired_deletes_expired_keeps_fresh(self):
         """cleanup_expired() 应删除已过期条目，保留未过期条目。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
         import json
 
         backend = SQLiteBackend(":memory:")
@@ -12631,7 +12631,7 @@ class TestRound7CleanupExpiredFixUnit:
 
     def test_cleanup_expired_returns_deleted_count(self):
         """cleanup_expired() 返回值应等于实际删除的过期条目数。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
         import json
 
         backend = SQLiteBackend(":memory:")
@@ -12654,7 +12654,7 @@ class TestRound7CleanupExpiredFixUnit:
 
     def test_cleanup_expired_limit_bounds_batch(self):
         """cleanup_expired(limit=n) 应最多删除 n 条（写路径清理有界，不一次性全删）。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
         import json
 
         backend = SQLiteBackend(":memory:")
@@ -12677,7 +12677,7 @@ class TestRound7CleanupExpiredFixUnit:
 
     def test_cleanup_expired_no_expired_returns_zero(self):
         """无过期条目时 cleanup_expired() 应返回 0 且不误删任何条目。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         backend = SQLiteBackend(":memory:")
         ns = "scope1:u1:stream"
@@ -12690,7 +12690,7 @@ class TestRound7CleanupExpiredFixUnit:
 
     def test_cleanup_expired_keeps_null_expires_at(self):
         """expires_at 为 NULL（永不过期）的条目不应被 cleanup_expired() 删除。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
         import json
 
         backend = SQLiteBackend(":memory:")
@@ -12720,7 +12720,7 @@ class TestRound7CleanupExpiredFixUnit:
     def test_stream_append_write_path_with_expired_present(self):
         """stream 写路径：存在过期条目时 stream_append 触发 cleanup_expired，
         不应抛 OperationalError（修复前 DELETE...LIMIT 崩溃），并正确回收过期条目。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
         import json
 
         backend = SQLiteBackend(":memory:")
@@ -12747,7 +12747,7 @@ class TestRound7CleanupExpiredFixUnit:
     def test_state_and_knowledge_write_paths_with_expired_present(self):
         """state/knowledge 写路径：存在过期条目时写操作触发 cleanup_expired，
         不应抛 OperationalError（修复前 DELETE...LIMIT 崩溃），并正确回收过期条目。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
         import json
 
         backend = SQLiteBackend(":memory:")
@@ -12792,7 +12792,7 @@ class TestRound7CleanupExpiredFixE2E:
     @pytest.mark.asyncio
     async def test_e2e_stream_full_chain_cleanup_after_expiry(self):
         """stream 完整链路：写入 → 过期 → 下次写入被动清理 → last() 只返回新条目。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         backend = SQLiteBackend(":memory:")
         ns = "scope1:u1:stream"
@@ -12813,7 +12813,7 @@ class TestRound7CleanupExpiredFixE2E:
     @pytest.mark.asyncio
     async def test_e2e_state_full_chain_cleanup_after_expiry(self):
         """state 完整链路：过期 state 条目在后续写入时被清理，get 返回新值。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         backend = SQLiteBackend(":memory:")
         ns = "scope1:u1:state"
@@ -12834,7 +12834,7 @@ class TestRound7CleanupExpiredFixE2E:
     @pytest.mark.asyncio
     async def test_e2e_knowledge_full_chain_cleanup_after_expiry(self):
         """knowledge 完整链路：过期 knowledge 条目在后续写入时被清理，搜索只命中新条目。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         backend = SQLiteBackend(":memory:")
         ns = "scope1:u1:knowledge"
@@ -12857,8 +12857,8 @@ class TestRound7CleanupExpiredFixE2E:
     async def test_e2e_manager_ttl_write_path_full_chain(self):
         """MemoryManager 全链路（真实 sqlite backend + scope ttl 配置）：
         写入设 expires_at → 过期后下次写入被动清理，last() 只返回新条目。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(ttl=0.05),
@@ -12885,7 +12885,7 @@ class TestRound7CleanupExpiredFixE2E:
         修复前 cleanup_expired 的 DELETE...LIMIT 会使每次写入抛
         sqlite3.OperationalError: near "LIMIT": syntax error。
         """
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
         import json
 
         backend = SQLiteBackend(":memory:")
@@ -12981,7 +12981,7 @@ class TestRound8NonStringSystemPromptUnit:
     def test_source_guard_precedes_path_resolution(self):
         """源码中非字符串守卫应位于 Path() 路径解析之前（防止对 MagicMock 构造垃圾路径）。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
         source = inspect.getsource(Weave._load_system_prompt)
         guard_idx = source.index("if not isinstance(prompt_path, str):")
         rel_idx = source.index("Path(prompt_path).relative_to")
@@ -13017,7 +13017,7 @@ class TestRound8NonStringSystemPromptUnit:
 
     def test_real_registry_fallback_loads_actual_system_md(self, tmp_path, monkeypatch):
         """真实 PromptRegistry：非字符串配置回退后加载 prompts/system.md 实际内容。"""
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
         from types import SimpleNamespace
         prompts_dir = tmp_path / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
@@ -13036,7 +13036,7 @@ class TestRound8StreamNonStringPromptE2E:
     @pytest.fixture
     def mock_weave(self):
         """构造与 TestStreamRaceCondition 相同的 fixture（MagicMock 配置 + 非字符串 prompts.system）。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
         weave._config.agent.name = "test_agent"
@@ -13044,7 +13044,7 @@ class TestRound8StreamNonStringPromptE2E:
         weave._config.loop.timeout = 5.0
         weave._event_bus = EventBus()
         weave._llm = AsyncMock()
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         weave._llm.chat = AsyncMock(return_value=LLMResponse(content="Hello", model="test-model"))
         weave._memory = MagicMock()
         weave._memory.activate_scopes = MagicMock()
@@ -13165,35 +13165,35 @@ class TestRound9BakCleanupUnit:
 
     def test_loop_iterative_py_bak_removed(self):
         """weave/loop/iterative.py.bak 应已删除（weave/ 内 8 个 .bak 之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "loop" / "iterative.py.bak").exists(),             "weave/loop/iterative.py.bak 应已清理"
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "loop" / "iterative.py.bak").exists(),             "weave/loop/iterative.py.bak 应已清理"
 
     def test_loop_scheduled_py_bak_removed(self):
         """weave/loop/scheduled.py.bak 应已删除（weave/ 内 8 个 .bak 之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "loop" / "scheduled.py.bak").exists(),             "weave/loop/scheduled.py.bak 应已清理"
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "loop" / "scheduled.py.bak").exists(),             "weave/loop/scheduled.py.bak 应已清理"
 
     def test_memory_knowledge_py_bak_removed(self):
         """weave/memory/knowledge.py.bak 应已删除（memory/ 4 个之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "knowledge.py.bak").exists(),             "weave/memory/knowledge.py.bak 应已清理"
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "knowledge.py.bak").exists(),             "weave/memory/knowledge.py.bak 应已清理"
 
     def test_memory_manager_py_bak_removed(self):
         """weave/memory/manager.py.bak 应已删除（memory/ 4 个之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "manager.py.bak").exists(),             "weave/memory/manager.py.bak 应已清理"
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "manager.py.bak").exists(),             "weave/memory/manager.py.bak 应已清理"
 
     def test_memory_state_py_bak_removed(self):
         """weave/memory/state.py.bak 应已删除（memory/ 4 个之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "state.py.bak").exists(),             "weave/memory/state.py.bak 应已清理"
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "state.py.bak").exists(),             "weave/memory/state.py.bak 应已清理"
 
     def test_memory_stream_py_bak_removed(self):
         """weave/memory/stream.py.bak 应已删除（memory/ 4 个之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "stream.py.bak").exists(),             "weave/memory/stream.py.bak 应已清理"
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "stream.py.bak").exists(),             "weave/memory/stream.py.bak 应已清理"
 
     def test_config_py_bak_removed(self):
         """weave/config.py.bak 应已删除（weave/ 内 8 个 .bak 之一，本轮再次清理）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "config.py.bak").exists(),             "weave/config.py.bak 应已清理"
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "config.py.bak").exists(),             "weave/config.py.bak 应已清理"
 
     def test_types_py_bak_removed(self):
         """weave/types.py.bak 应已删除（weave/ 内 8 个 .bak 之一，本轮再次清理）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "types.py.bak").exists(),             "weave/types.py.bak 应已清理"
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "types.py.bak").exists(),             "weave/types.py.bak 应已清理"
 
     def test_review_record_bak_removed(self):
         """nexus/review_record.md.bak 应已删除（第9轮清理的 9 个 .bak 之一）。"""
@@ -13220,14 +13220,14 @@ class TestRound9BakCleanupE2E:
     def test_e2e_round9_cleaned_files_absent_anywhere(self):
         """本轮清理的 9 个 .bak 文件应全部从项目中消失（已知路径逐一验证）。"""
         known_paths = [
-            self.PROJECT_ROOT / "weave" / "config.py.bak",
-            self.PROJECT_ROOT / "weave" / "types.py.bak",
-            self.PROJECT_ROOT / "weave" / "loop" / "iterative.py.bak",
-            self.PROJECT_ROOT / "weave" / "loop" / "scheduled.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "knowledge.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "manager.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "state.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "stream.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "config.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "types.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "loop" / "iterative.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "loop" / "scheduled.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "knowledge.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "manager.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "state.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "stream.py.bak",
             self.PROJECT_ROOT / "nexus" / "review_record.md.bak",
         ]
         for p in known_paths:
@@ -13240,7 +13240,7 @@ class TestRound9BakCleanupE2E:
 
     def test_e2e_no_bak_in_weave_source_tree(self):
         """weave/ 源码整棵树递归扫描不应存在任何 .bak 文件。"""
-        weave_dir = self.PROJECT_ROOT / "weave"
+        weave_dir = self.PROJECT_ROOT / "weave_agent_sdk"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in weave_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/ 源码树残留 .bak: {bak_files}"
 
@@ -13316,7 +13316,7 @@ class TestRound10SystemPromptBareNameUnit:
     def test_bare_name_registry_missing_falls_back_to_real_file(self, tmp_path, monkeypatch):
         """registry 无此命名 prompt（get 抛 FileNotFoundError）时，回退按真实文件
         加载 CWD 下同名文件（错误信息指向完整路径）。"""
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
         # CWD 中存在真实文件 "system"
         monkeypatch.chdir(tmp_path)
         (tmp_path / "system").write_text("real cwd file content", encoding="utf-8")
@@ -13329,7 +13329,7 @@ class TestRound10SystemPromptBareNameUnit:
 
     def test_bare_name_registry_missing_real_file_missing_raises_full_path_error(self, tmp_path, monkeypatch):
         """registry 与 CWD 真实文件均不存在时，应抛 FileNotFoundError 且消息含完整路径。"""
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
         monkeypatch.chdir(tmp_path)
         registry = PromptRegistry(base_dir=tmp_path / "prompts")
 
@@ -13343,7 +13343,7 @@ class TestRound10SystemPromptBareNameUnit:
     def test_bare_name_registry_wins_over_cwd_file(self, tmp_path, monkeypatch):
         """核心回归：CWD 下存在同名文件时，bare name 仍应经 registry 解析
         （registry 内容优先），修复前会误读 CWD 文件/抛错。"""
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
         monkeypatch.chdir(tmp_path)
         (tmp_path / "system").write_text("CWD FILE CONTENT", encoding="utf-8")
         prompts_dir = tmp_path / "prompts"
@@ -13358,7 +13358,7 @@ class TestRound10SystemPromptBareNameUnit:
         """源码断言：裸文件名 registry 分支（parent == Path('.')）应先于真实文件
         load_prompt 直载，保证配置写 "system" 时先经 registry 而非直载 CWD。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave._load_system_prompt)
         assert 'if not path.is_absolute() and path.parent == Path("."):' in source
@@ -13369,7 +13369,7 @@ class TestRound10SystemPromptBareNameUnit:
     def test_source_bare_name_uses_stem_for_suffix(self):
         """源码断言：带后缀裸名取 stem（system.md → system），无后缀取 name。"""
         import inspect
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         source = inspect.getsource(Weave._load_system_prompt)
         assert "name = path.stem if path.suffix else path.name" in source
@@ -13399,7 +13399,7 @@ class TestRound10SystemPromptBareNameE2E:
 
     def _make_stream_weave(self):
         """构造最小可 stream()/arun() 的 Weave 实例：prompts.system 为裸名 "system"。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         weave = Weave.__new__(Weave)
         weave._config = MagicMock()
@@ -13410,7 +13410,7 @@ class TestRound10SystemPromptBareNameE2E:
         weave._config.prompts.system = "system"   # 裸文件名（本轮修复核心场景）
         weave._event_bus = EventBus()
         weave._llm = AsyncMock()
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.llm.base import LLMResponse
         weave._llm.chat = AsyncMock(return_value=LLMResponse(content="Hello", model="test-model"))
         weave._memory = MagicMock()
         weave._memory.activate_scopes = MagicMock()
@@ -13461,7 +13461,7 @@ class TestRound10SystemPromptBareNameE2E:
     def test_e2e_bare_name_real_registry_loads_prompts_system_md(self, tmp_path, monkeypatch):
         """真实 PromptRegistry：prompts.system='system' 经 registry 加载
         prompts/system.md 实际内容（裸名 → prompts/{name}.md 解析）。"""
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
         from types import SimpleNamespace
 
         prompts_dir = tmp_path / "prompts"
@@ -13477,7 +13477,7 @@ class TestRound10SystemPromptBareNameE2E:
     def test_e2e_bare_name_md_suffix_real_registry_loads_prompts_system_md(self, tmp_path, monkeypatch):
         """真实 PromptRegistry：prompts.system='system.md' 取 stem 'system'
         加载 prompts/system.md 实际内容。"""
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
         from types import SimpleNamespace
 
         prompts_dir = tmp_path / "prompts"
@@ -13493,7 +13493,7 @@ class TestRound10SystemPromptBareNameE2E:
     def test_e2e_bare_name_fallback_real_file_when_registry_missing(self, tmp_path, monkeypatch):
         """真实链路：registry 无 "system" 命名 prompt 且 CWD 存在同名文件时，
         回退加载 CWD 真实文件（错误信息指向完整路径）。"""
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
         from types import SimpleNamespace
 
         monkeypatch.chdir(tmp_path)
@@ -13521,8 +13521,8 @@ class TestRound11TTLRecheckUnit:
 
     def test_ttl_for_namespace_none_when_scope_unconfigured(self):
         """_ttl_for_namespace 对已配置 scope 返回 ttl，对未配置 scope 返回 None。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(ttl=3600),
@@ -13538,8 +13538,8 @@ class TestRound11TTLRecheckUnit:
     @pytest.mark.asyncio
     async def test_manager_write_sets_expires_at_and_cleanup(self):
         """MemoryManager 写入按 scope ttl 设 expires_at；过期后读写路径均回收。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(ttl=0.05),
@@ -13570,8 +13570,8 @@ class TestRound11StateNarrowWideRecheckUnit:
     @pytest.mark.asyncio
     async def test_state_get_all_three_scopes_narrow_wins(self):
         """三个 scope（narrow/mid/wide）同 key 时，最窄 scope 覆盖宽 scope。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=20, state={"backend": "sqlite", "path": ":memory:"}),
@@ -13593,8 +13593,8 @@ class TestRound11StateNarrowWideRecheckUnit:
     @pytest.mark.asyncio
     async def test_state_get_all_unions_unique_keys_across_scopes(self):
         """各 scope 独有的 key 应并集保留，不被互相覆盖。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=10, state={"backend": "sqlite", "path": ":memory:"}),
@@ -13619,7 +13619,7 @@ class TestRound11ToolTypeRecheckUnit:
     def test_resolve_param_type_union_with_multiple_non_none_takes_first(self):
         """Union 含多个非 None 分支时取第一个；仅 None 与单类型时正确解包。"""
         from typing import Union
-        from weave.loop.iterative import _resolve_param_type
+        from weave_agent_sdk.loop.iterative import _resolve_param_type
 
         assert _resolve_param_type(Union[str, int]) == "string"
         assert _resolve_param_type(Union[float, str]) == "number"
@@ -13629,7 +13629,7 @@ class TestRound11ToolTypeRecheckUnit:
     def test_build_tool_schemas_required_only_for_no_default(self):
         """仅无默认值的参数进入 required；Optional/list/dict 类型推断正确。"""
         from typing import Optional
-        from weave.loop.iterative import _build_tool_schemas
+        from weave_agent_sdk.loop.iterative import _build_tool_schemas
 
         def analyze(source, limit=5, tags=None, meta=None):
             """Analyze source."""
@@ -13664,8 +13664,8 @@ class TestRound11PromptPathRecheckUnit:
     def test_load_system_prompt_absolute_path_direct_load(self, tmp_path, monkeypatch):
         """绝对路径应直接加载真实文件内容（不经 registry 名称解析）。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
 
         abs_file = tmp_path / "external" / "system.md"
         abs_file.parent.mkdir(parents=True, exist_ok=True)
@@ -13682,8 +13682,8 @@ class TestRound11PromptPathRecheckUnit:
     def test_load_system_prompt_bare_name_registry_missing_falls_back_real_file(self, tmp_path, monkeypatch):
         """裸文件名在 registry 无此命名 prompt 时回退加载 CWD 真实文件。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
 
         # CWD 存在同名文件，registry 无此命名 prompt
         monkeypatch.chdir(tmp_path)
@@ -13706,8 +13706,8 @@ class TestRound11ScheduledNoPhantomRecheckUnit:
     @pytest.mark.asyncio
     async def test_execute_once_writes_state_when_state_namespace_present(self):
         """激活了 state ns → state.set 写入 last_run_at / last_run_error 各 1 次。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -13741,8 +13741,8 @@ class TestRound11ScheduledNoPhantomRecheckUnit:
     async def test_execute_once_no_state_write_when_get_namespaces_empty(self):
         """get_namespaces 返回 []（TestRound7ReentryE2E 的 Mock 形态）时
         state.set 不被调用——该测试断言 state.set≥2 属漂移。"""
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -13795,7 +13795,7 @@ class TestRound11TTLRecheckE2E:
             "prompts: {}\nfeatures: {}\nserver: {}\nlogging: {}\n",
             encoding="utf-8",
         )
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         config = load_config(yaml_path)
         assert config.memory.scopes["session"].ttl_stream == 0.05
@@ -13823,7 +13823,7 @@ class TestRound11StateNarrowWideRecheckE2E:
     @pytest.mark.asyncio
     async def test_e2e_state_narrow_wins_three_scopes(self, tmp_path):
         """经 load_config 全链路：三 scope 同 key → 最窄 scope 覆盖宽 scope。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r11_state.yaml"
         yaml_path.write_text(
@@ -13871,7 +13871,7 @@ class TestRound11ToolTypeRecheckE2E:
     def test_e2e_tool_schema_full_with_generic_optional(self):
         """真实 tool 函数（Optional/list/dict 注解）生成正确 JSON Schema。"""
         from typing import Any, Optional
-        from weave.loop.iterative import _build_tool_schemas
+        from weave_agent_sdk.loop.iterative import _build_tool_schemas
 
         def search_kb(query, top_k=5, filters=None, meta=None):
             """Search the knowledge base."""
@@ -13905,8 +13905,8 @@ class TestRound11PromptPathRecheckE2E:
     def test_e2e_load_system_prompt_absolute_and_bare_name(self, tmp_path, monkeypatch):
         """绝对路径直载真实文件；裸名经 registry 解析为 prompts/system.md。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
 
         abs_file = tmp_path / "ext" / "prompt.md"
         abs_file.parent.mkdir(parents=True, exist_ok=True)
@@ -13945,10 +13945,10 @@ class TestRound11ScheduledNoPhantomRecheckE2E:
     async def test_e2e_scheduled_run_no_phantom_when_no_scope_active(self):
         """真实 MemoryManager 未激活任何 scope 时，scheduled 单次执行不写
         幻影 default:session:state，且不创建任何 backend。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         manager = MemoryManager(MemoryConfig())
         # 未激活任何 scope → 任意 access_type 均返回 []
@@ -13999,7 +13999,7 @@ class TestRound12TTLUnit:
     def test_parse_memory_scopes_ttl_from_state_and_knowledge_blocks(self):
         """ttl 写在 state / knowledge access 块内应解析到 ttl_state / ttl_knowledge；
         scope 级 ttl 仍优先于所有 access 块内 ttl。"""
-        from weave.config import _parse_memory_scopes
+        from weave_agent_sdk.config import _parse_memory_scopes
 
         # state / knowledge 块的 ttl 各自解析到对应 access 字段
         scopes = _parse_memory_scopes({
@@ -14035,7 +14035,7 @@ class TestRound12TTLUnit:
     async def test_read_paths_exclude_expired_without_cleanup(self):
         """过期条目在读取路径上即被排除（stream.last / state.get / state.get_all /
         knowledge.search 均带 expires_at 过滤），即便尚未触发写路径清理。"""
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
         import json
 
         backend = SQLiteBackend(":memory:")
@@ -14110,7 +14110,7 @@ class TestRound12TTLE2E:
             "prompts: {}\nfeatures: {}\nserver: {}\nlogging: {}\n",
             encoding="utf-8",
         )
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         config = load_config(yaml_path)
         assert config.memory.scopes["session"].ttl == 0.05
@@ -14140,8 +14140,8 @@ class TestRound12StateNarrowWideUnit:
     @pytest.mark.asyncio
     async def test_state_get_all_narrow_absence_keeps_wide_value(self):
         """窄 scope 没有某 key 时不覆盖宽 scope 的该 key（窄缺值不抹除宽值）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=10, state={"backend": "sqlite", "path": ":memory:"}),
@@ -14162,8 +14162,8 @@ class TestRound12StateNarrowWideUnit:
     @pytest.mark.asyncio
     async def test_state_get_all_narrow_wins_regardless_of_write_order(self):
         """窄 scope 后写仍胜出（合并按宽→窄应用，与写入顺序无关）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=10, state={"backend": "sqlite", "path": ":memory:"}),
@@ -14188,7 +14188,7 @@ class TestRound12StateNarrowWideE2E:
     async def test_e2e_three_scopes_narrow_absence_wide_value_surfaces(self, tmp_path):
         """三 scope（narrow/mid/wide）经 load_config 全链路：narrow 无某 key 时
         mid/wide 的该 key 值正常呈现，不被窄 scope 缺值抹除。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r12_state_three.yaml"
         yaml_path.write_text(
@@ -14245,7 +14245,7 @@ class TestRound12ToolTypeInferenceUnit:
         """嵌套 Optional 泛型：Optional[list[str]] → array、list[Optional[int]] →
         array、Union[list, None] → array、dict | None → object（PEP 604 裸类型）。"""
         from typing import Optional, Union
-        from weave.loop.iterative import _resolve_param_type
+        from weave_agent_sdk.loop.iterative import _resolve_param_type
 
         assert _resolve_param_type(Optional[list[str]]) == "array"
         assert _resolve_param_type(list[Optional[int]]) == "array"
@@ -14257,7 +14257,7 @@ class TestRound12ToolTypeInferenceUnit:
         """无参数 tool 的 schema 不应包含 required 键；Optional 无默认值参数仍必填；
         有默认值参数不进入 required。"""
         from typing import Optional
-        from weave.loop.iterative import _build_tool_schemas
+        from weave_agent_sdk.loop.iterative import _build_tool_schemas
 
         def no_args():
             """No args tool."""
@@ -14294,7 +14294,7 @@ class TestRound12ToolTypeInferenceE2E:
     def test_e2e_tool_schema_nested_optional_generic_full(self):
         """嵌套 Optional 泛型 + 有默认值参数 + PEP 604 可选 dict 生成完整正确的 JSON Schema。"""
         from typing import Optional
-        from weave.loop.iterative import _build_tool_schemas
+        from weave_agent_sdk.loop.iterative import _build_tool_schemas
 
         def analyze(queries: Optional[list[str]], limit: int = 10, params: dict | None = None):
             """Analyze with optional nested types."""
@@ -14328,7 +14328,7 @@ class TestRound12PromptPathUnit:
         """绝对路径直载真实文件，且不调用 registry.get（证明未回退 stem 名称解析，
         不会因 PurePath.stem 截断目录而静默加载错误文件）。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         abs_file = tmp_path / "deep" / "nested" / "system.md"
         abs_file.parent.mkdir(parents=True, exist_ok=True)
@@ -14350,7 +14350,7 @@ class TestRound12PromptPathUnit:
         """非 prompts/ 前缀、含目录分隔符的相对路径直接加载真实文件（相对 CWD），
         不经 registry 名称解析。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
+        from weave_agent_sdk.agent import Weave
 
         custom = tmp_path / "custom_prompts" / "system.md"
         custom.parent.mkdir(parents=True, exist_ok=True)
@@ -14376,8 +14376,8 @@ class TestRound12PromptPathE2E:
         """绝对路径 / 非 prompts/ 相对路径直载真实文件；prompts/ 相对与裸名经
         registry 解析——四类路径各归其位。"""
         from types import SimpleNamespace
-        from weave.agent import Weave
-        from weave.prompts.prompt_registry import PromptRegistry
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
 
         prompts_dir = tmp_path / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
@@ -14426,7 +14426,7 @@ class TestRound12ScheduledNoPhantomUnit:
     async def test_execute_once_exception_path_no_phantom_state_write(self):
         """LLM 调用抛异常（走 except 分支）且无 state ns 时，仍不写幻影 ns
         （state.set 在异常路径也不被调用）。"""
-        from weave.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
 
         agent = MagicMock()
         agent._config = MagicMock()
@@ -14456,10 +14456,10 @@ class TestRound12ScheduledNoPhantomUnit:
     async def test_default_scope_state_write_uses_active_ns_not_phantom(self):
         """空配置激活默认 scope 后，state 写入落在激活的 default:default:state，
         而非旧硬编码的幻影 default:session:state。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
         manager.activate_scopes()  # 空配置 → 默认 scope [("default", 0, "default")]
@@ -14498,10 +14498,10 @@ class TestRound12ScheduledNoPhantomE2E:
     async def test_e2e_scheduled_writes_only_real_activated_state_ns(self):
         """scheduled 单次执行（经 run() 入口）持久化 stream + state 到激活的
         session 真实 ns，不写任何幻影 default:session:state。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.loop.scheduled import ScheduledLoop
-        from weave.llm.base import LLMResponse
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.loop.scheduled import ScheduledLoop
+        from weave_agent_sdk.llm.base import LLMResponse
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(
@@ -14567,7 +14567,7 @@ class TestRound13TTLAccessTypeUnit:
     def test_parse_memory_scopes_ttl_split_by_access_type(self):
         """_parse_memory_scopes 应将 stream/state/knowledge 各自的 ttl
         解析到 ttl_stream/ttl_state/ttl_knowledge，而非折叠为单一 scope 级值。"""
-        from weave.config import _parse_memory_scopes
+        from weave_agent_sdk.config import _parse_memory_scopes
 
         scopes = _parse_memory_scopes({
             "session": {
@@ -14586,8 +14586,8 @@ class TestRound13TTLAccessTypeUnit:
     def test_ttl_for_namespace_prefers_access_specific_and_falls_back(self):
         """_ttl_for_namespace 按 access_type 优先取专属 ttl；未配置时回退
         scope 级 ttl；均未配置回退 None（永不过期）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         # 全 access 专属 ttl
         manager = MemoryManager(MemoryConfig(scopes={
@@ -14620,10 +14620,10 @@ class TestRound13BackendWiringUnit:
 
     def test_get_backend_creates_file_and_default_sqlite(self, tmp_path):
         """配置 file backend 时创建 FileBackend 并缓存；未配置时默认 SQLiteBackend。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.file import FileBackend
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         db_dir = str(tmp_path / "file_mem")
         scopes = {"session": MemoryScopeConfig(
@@ -14643,10 +14643,10 @@ class TestRound13BackendWiringUnit:
     def test_get_backend_chroma_knowledge_vs_stream_fallback(self):
         """chroma 用于 knowledge → ChromaBackend；配置到 stream/state 时应
         回退 sqlite（避免向量后端用错语义），而非静默使用。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.chroma import ChromaBackend
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         scopes = {"session": MemoryScopeConfig(
             knowledge={"backend": "chroma", "path": "./data/vectors"},
@@ -14662,7 +14662,7 @@ class TestRound13BackendWiringUnit:
         """FileBackend.stream_append 带 ttl 时记录 _expires_at；读路径过滤过期；
         cleanup_expired 回收。永不过期条目（无 ttl）不设 _expires_at。"""
         import time
-        from weave.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.backends.file import FileBackend
 
         backend = FileBackend(str(tmp_path / "fb_stream"))
         ns = "scope1:u1:stream"
@@ -14686,7 +14686,7 @@ class TestRound13BackendWiringUnit:
         """FileBackend.state_set / knowledge_add 带 ttl 时写入 _expires_at，
         过期条目被 state_get / knowledge_search 过滤。"""
         import time
-        from weave.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.backends.file import FileBackend
 
         backend = FileBackend(str(tmp_path / "fb_sk"))
         state_ns = "scope1:u1:state"
@@ -14713,8 +14713,8 @@ class TestRound13StateGetAllNoneUnit:
     async def test_get_all_none_narrow_wins(self):
         """get_all(None) 复用激活 scope 的 namespace 列表（窄→宽），按宽→窄
         合并，同 key 窄 scope 覆盖宽 scope。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=10, state={"backend": "sqlite", "path": ":memory:"}),
@@ -14734,8 +14734,8 @@ class TestRound13StateGetAllNoneUnit:
     async def test_get_all_none_consistent_with_explicit_path(self):
         """无参数路径与显式传入 namespaces 应给出相同结果（同 key 窄胜），
         消除两条读取路径对同 key 给出不同值的旧不一致。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=10, state={"backend": "sqlite", "path": ":memory:"}),
@@ -14759,8 +14759,8 @@ class TestRound13SubscriptionRebuildUnit:
         """agent.stream() 与 ws_agent_stream 的重建顺序必须是：先注册新订阅、
         再 aclose 旧生成器——避免"旧已注销、新未注册"空窗内 emit 的事件被丢弃。"""
         import inspect
-        from weave.agent import Weave
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         for name, source in (("agent.stream", inspect.getsource(Weave.stream)),
                              ("ws_agent_stream", inspect.getsource(ws_agent_stream))):
@@ -14778,7 +14778,7 @@ class TestRound13StatsExpiredUnit:
         """MemoryManager.stats() 应先 cleanup() 再 namespace_stats()；
         SQLiteBackend 与 FileBackend 的 namespace_stats 均排除已过期条目。"""
         import inspect
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         source = inspect.getsource(MemoryManager.stats)
         assert "self.cleanup()" in source
@@ -14787,7 +14787,7 @@ class TestRound13StatsExpiredUnit:
             "stats() 应先清理过期数据再统计"
 
         # SQLite：namespace_stats 排除过期
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
         backend = SQLiteBackend(":memory:")
         ns = "s:1:stream"
         now = time.time()
@@ -14805,7 +14805,7 @@ class TestRound13StatsExpiredUnit:
         assert backend.namespace_stats().get(ns) == 1, "SQLite namespace_stats 应排除已过期条目"
 
         # File：namespace_stats 排除过期（与 SQLite 契约一致）
-        from weave.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.backends.file import FileBackend
         fb = FileBackend(str(tmp_path / "fb_stats"))
         fns = "s:2:stream"
         fb.stream_append({"role": "user", "content": "expired"}, fns, ttl=0.05)
@@ -14827,7 +14827,7 @@ class TestRound13TTLAccessTypeE2E:
     @pytest.mark.asyncio
     async def test_e2e_ttl_split_per_access_type(self, tmp_path):
         import time
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r13_ttl_split.yaml"
         yaml_path.write_text(
@@ -14880,7 +14880,7 @@ class TestRound13FileBackendE2E:
     @pytest.mark.asyncio
     async def test_e2e_file_backend_ttl_full_chain(self, tmp_path):
         import time
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         mem_dir = (tmp_path / "mem").as_posix()
         yaml_path = tmp_path / "r13_file.yaml"
@@ -14920,7 +14920,7 @@ class TestRound13StateGetAllNoneE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_get_all_none_narrow_wins(self, tmp_path):
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r13_state_none.yaml"
         yaml_path.write_text(
@@ -14962,7 +14962,7 @@ class TestRound13SubscriptionRebuildE2E:
 
     @pytest.mark.asyncio
     async def test_e2e_rebuild_no_event_gap(self):
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         old_gen = bus.subscribe("token", "done")
@@ -14990,7 +14990,7 @@ class TestRound13StatsE2E:
     @pytest.mark.asyncio
     async def test_e2e_stats_cleans_expired_and_counts_fresh(self, tmp_path):
         import time
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r13_stats.yaml"
         yaml_path.write_text(
@@ -15055,33 +15055,33 @@ class TestRound14BakCleanupUnit:
 
     def test_config_py_bak_removed(self):
         """weave/config.py.bak 应已删除（weave/ 内 6 个 .bak 之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "config.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "config.py.bak").exists(), \
             "weave/config.py.bak 应已清理"
 
     def test_types_py_bak_removed(self):
         """weave/types.py.bak 应已删除（weave/ 内 6 个 .bak 之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "types.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "types.py.bak").exists(), \
             "weave/types.py.bak 应已清理"
 
     def test_memory_manager_py_bak_removed(self):
         """weave/memory/manager.py.bak 应已删除（weave/ 内 6 个 .bak 之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "manager.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "manager.py.bak").exists(), \
             "weave/memory/manager.py.bak 应已清理"
 
     def test_memory_state_py_bak_removed(self):
         """weave/memory/state.py.bak 应已删除（weave/ 内 6 个 .bak 之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "state.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "state.py.bak").exists(), \
             "weave/memory/state.py.bak 应已清理"
 
     def test_memory_backends_file_py_bak_removed(self):
         """weave/memory/backends/file.py.bak 应已删除（本轮核心：第13轮 FileBackend
         接线产生的备份，既有 TestRound4/9 未覆盖到）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "backends" / "file.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends" / "file.py.bak").exists(), \
             "weave/memory/backends/file.py.bak 应已清理"
 
     def test_memory_backends_sqlite_py_bak_removed(self):
         """weave/memory/backends/sqlite.py.bak 应已删除（本轮核心：既有测试未覆盖）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "backends" / "sqlite.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends" / "sqlite.py.bak").exists(), \
             "weave/memory/backends/sqlite.py.bak 应已清理"
 
     def test_review_record_md_bak_removed(self):
@@ -15091,13 +15091,13 @@ class TestRound14BakCleanupUnit:
 
     def test_memory_backends_dir_clean(self):
         """weave/memory/backends/ 目录内不应存在任何 .bak 文件（本轮新增覆盖目录）。"""
-        backends_dir = self.PROJECT_ROOT / "weave" / "memory" / "backends"
+        backends_dir = self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in backends_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/memory/backends 残留 .bak: {bak_files}"
 
     def test_weave_package_tree_no_bak(self):
         """weave/ 源码整棵树递归扫描不应存在任何 .bak 文件（含 memory/backends）。"""
-        weave_dir = self.PROJECT_ROOT / "weave"
+        weave_dir = self.PROJECT_ROOT / "weave_agent_sdk"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in weave_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/ 源码树残留 .bak: {bak_files}"
 
@@ -15116,12 +15116,12 @@ class TestRound14BakCleanupE2E:
     def test_e2e_round14_cleaned_files_absent_anywhere(self):
         """本轮清理的 7 个 .bak 文件应全部从项目中消失（已知路径逐一验证）。"""
         known_paths = [
-            self.PROJECT_ROOT / "weave" / "config.py.bak",
-            self.PROJECT_ROOT / "weave" / "types.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "manager.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "state.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "backends" / "file.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "backends" / "sqlite.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "config.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "types.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "manager.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "state.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends" / "file.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends" / "sqlite.py.bak",
             self.PROJECT_ROOT / "nexus" / "review_record.md.bak",
         ]
         for p in known_paths:
@@ -15134,13 +15134,13 @@ class TestRound14BakCleanupE2E:
 
     def test_e2e_no_bak_in_weave_source_tree(self):
         """weave/ 源码整棵树递归扫描不应存在任何 .bak 文件。"""
-        weave_dir = self.PROJECT_ROOT / "weave"
+        weave_dir = self.PROJECT_ROOT / "weave_agent_sdk"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in weave_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/ 源码树残留 .bak: {bak_files}"
 
     def test_e2e_no_bak_in_memory_tree(self):
         """weave/memory/ 整棵树（含 backends/）递归扫描不应存在任何 .bak 文件。"""
-        memory_dir = self.PROJECT_ROOT / "weave" / "memory"
+        memory_dir = self.PROJECT_ROOT / "weave_agent_sdk" / "memory"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in memory_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/memory/ 残留 .bak: {bak_files}"
 
@@ -15180,7 +15180,7 @@ class TestRound15TTLAccessTypeUnit:
     def test_parse_memory_scopes_partial_access_ttl(self):
         """仅配置 stream 的 ttl 时 ttl_stream 生效、state/knowledge 回退 None；
         scope 级 ttl 仍作为统一回退值。"""
-        from weave.config import _parse_memory_scopes
+        from weave_agent_sdk.config import _parse_memory_scopes
 
         scopes = _parse_memory_scopes({
             "session": {
@@ -15200,8 +15200,8 @@ class TestRound15TTLAccessTypeUnit:
     def test_ttl_for_namespace_missing_access_and_invalid(self):
         """access 专属 ttl 未配置且 scope 级 ttl 未配置时返回 None（永不过期）；
         非法 access_type 一律返回 None，不抛错。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(
@@ -15223,9 +15223,9 @@ class TestRound15BackendWiringUnit:
 
     def test_get_backend_unknown_backend_falls_back_sqlite(self, caplog):
         """未知 backend 类型（如 mongo）应告警并回退 SQLiteBackend，而非静默崩溃。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         scopes = {"session": MemoryScopeConfig(stream={"backend": "mongo", "path": ":memory:"})}
         manager = MemoryManager(MemoryConfig(scopes=scopes, default_path=":memory:"))
@@ -15238,8 +15238,8 @@ class TestRound15BackendWiringUnit:
 
     def test_get_backend_caches_shared_instance_by_type_and_path(self, tmp_path):
         """同一 (backend_type, db_path) 应共享缓存实例；不同 path 实例独立。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         dir1 = str(tmp_path / "m1")
         dir2 = str(tmp_path / "m2")
@@ -15260,7 +15260,7 @@ class TestRound15BackendWiringUnit:
     def test_file_backend_stream_last_scan_all_files(self, tmp_path):
         """FileBackend.stream_last(namespaces=None) 应扫描全部 stream 文件、
         过滤过期并跨文件合并。"""
-        from weave.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.backends.file import FileBackend
 
         backend = FileBackend(str(tmp_path / "fb_scan"))
         backend.stream_append({"role": "user", "content": "persist"}, "s1:u1:stream")
@@ -15273,7 +15273,7 @@ class TestRound15BackendWiringUnit:
 
     def test_file_backend_cleanup_expired_bounded_by_limit(self, tmp_path):
         """FileBackend.cleanup_expired(limit=n) 应最多清理 n 条过期条目（有界）。"""
-        from weave.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.backends.file import FileBackend
 
         backend = FileBackend(str(tmp_path / "fb_limit"))
         ns = "s:u:stream"
@@ -15301,8 +15301,8 @@ class TestRound15StateGetAllNoneUnit:
     @pytest.mark.asyncio
     async def test_get_all_none_empty_when_no_active_scopes(self):
         """无激活 scope 时 get_all(None) 应返回空 dict（不抛错、不写任何 ns）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
         assert await manager.state.get_all() == {}
@@ -15310,8 +15310,8 @@ class TestRound15StateGetAllNoneUnit:
     @pytest.mark.asyncio
     async def test_get_all_none_three_scopes_narrow_wins_and_unions(self):
         """三 scope 下 get_all(None)：同 key 最窄覆盖宽；各 scope 独有 key 并集保留。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=20, state={"backend": "sqlite", "path": ":memory:"}),
@@ -15340,8 +15340,8 @@ class TestRound15SubscriptionRebuildUnit:
         应被 try/except 包裹（aclose 失败不阻断重建与继续等待），且顺序为
         先注册新订阅、再 aclose 旧生成器。"""
         import inspect
-        from weave.agent import Weave
-        from weave.server.ws import ws_agent_stream
+        from weave_agent_sdk.agent import Weave
+        from weave_agent_sdk.server.ws import ws_agent_stream
 
         for name, source in (("agent.stream", inspect.getsource(Weave.stream)),
                              ("ws_agent_stream", inspect.getsource(ws_agent_stream))):
@@ -15360,8 +15360,8 @@ class TestRound15StatsExpiredUnit:
 
     def test_stats_no_backends_returns_empty(self):
         """MemoryManager.stats() 在无任何 backend（未写入）时返回空 dict（cleanup no-op）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
         assert manager.stats() == {}
@@ -15370,8 +15370,8 @@ class TestRound15StatsExpiredUnit:
     async def test_stats_cleans_across_all_backends_before_count(self, tmp_path):
         """stats() 的 cleanup 应作用于全部后端（多个 db 文件），统计前先回收
         每个后端中的过期条目。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         scopes = {
             "a": MemoryScopeConfig(stream={"backend": "sqlite", "path": str(tmp_path / "a.db")}),
@@ -15411,7 +15411,7 @@ class TestRound15TTLAccessTypeE2E:
     async def test_e2e_ttl_split_partial_per_access(self, tmp_path):
         """YAML 仅 stream 配 ttl、state/knowledge 未配 ttl：stream 过期被过滤，
         state / knowledge 持久（各自独立 TTL 语义）。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r15_ttl_partial.yaml"
         yaml_path.write_text(
@@ -15461,7 +15461,7 @@ class TestRound15FileBackendE2E:
     @pytest.mark.asyncio
     async def test_e2e_file_backend_mixed_access_ttl(self, tmp_path):
         """FileBackend：stream 短 TTL 过期被过滤，state 长 TTL 持久，knowledge 无 TTL 持久。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         mem_dir = (tmp_path / "mem").as_posix()
         yaml_path = tmp_path / "r15_file.yaml"
@@ -15509,7 +15509,7 @@ class TestRound15StateGetAllNoneE2E:
     async def test_e2e_get_all_none_three_scopes(self, tmp_path):
         """YAML 三 scope（wide/mid/narrow）下 get_all(None)：同 key 最窄覆盖宽，
         独有 key 并集保留。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r15_state_none.yaml"
         yaml_path.write_text(
@@ -15561,7 +15561,7 @@ class TestRound15SubscriptionRebuildE2E:
     async def test_e2e_rebuild_gap_multi_event_types_no_loss(self):
         """旧订阅已消费进入 try 块后重建：空窗内跨多种事件类型的 emit 全部被新
         订阅收到；旧订阅 aclose 后订阅数回落、最终全部清理无残留。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         old = bus.subscribe("token", "tool_call", "done")
@@ -15597,7 +15597,7 @@ class TestRound15StatsE2E:
     async def test_e2e_stats_cleans_expired_file_backend(self, tmp_path):
         """YAML FileBackend：stream 短 TTL 条目过期后，stats() 内先 cleanup 回收
         （计数 0），state 长 TTL 条目正常计入（计数 1）。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         mem_dir = (tmp_path / "mem").as_posix()
         yaml_path = tmp_path / "r15_stats.yaml"
@@ -15658,8 +15658,8 @@ class TestRound16TTLAccessSplitUnit:
     def test_ttl_for_namespace_prefers_each_access_specific(self):
         """同一 scope 下 stream/state/knowledge 各自独立 TTL 被 _ttl_for_namespace
         按 access_type 精确取用；均未配置时回退 scope 级 ttl。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(
@@ -15721,10 +15721,10 @@ class TestRound16BackendWiringUnit:
     def test_mixed_backends_per_access_same_scope(self, tmp_path):
         """同一 scope 下 stream 用 file、state 用 sqlite、knowledge 用 file：
         各 namespace 解析到对应后端类型，同 (type, path) 共享实例。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.file import FileBackend
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         mem_dir = str(tmp_path / "mem")
         scopes = {"session": MemoryScopeConfig(
@@ -15747,9 +15747,9 @@ class TestRound16BackendWiringUnit:
 
     def test_manager_close_clears_and_recreates_backend(self, tmp_path):
         """close() 清空 _backends 缓存；之后再次访问按配置重建后端实例（可复用）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(stream={"backend": "sqlite", "path": str(tmp_path / "mem.db")}),
@@ -15774,8 +15774,8 @@ class TestRound16StateGetAllNoneUnit:
     async def test_get_all_none_narrow_delete_reveals_wide(self):
         """get_all(None) 下窄 scope 删除某 key 后，宽 scope 的同 key 值应浮现
         （删除只影响窄 scope 自身，不抹除宽 scope 数据）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "wide": MemoryScopeConfig(priority=10, state={"backend": "sqlite", "path": ":memory:"}),
@@ -15796,8 +15796,8 @@ class TestRound16StateGetAllNoneUnit:
     @pytest.mark.asyncio
     async def test_get_all_none_filters_expired_entries(self):
         """get_all(None) 不返回已过期 state 条目（读取路径过滤与显式路径一致）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(ttl=0.05, state={"backend": "sqlite", "path": ":memory:"}),
@@ -15819,7 +15819,7 @@ class TestRound16SubscriptionRebuildUnit:
     async def test_rebuild_registration_order_never_drops_to_zero(self):
         """重建期间订阅计数变化为 1 → 2 → 1（先注册新、再 aclose 旧），
         全程不为 0——即不存在"旧已注销、新未注册"的事件丢失空窗。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen1 = bus.subscribe("token")
@@ -15844,7 +15844,7 @@ class TestRound16SubscriptionRebuildUnit:
     async def test_rebuild_new_subscriber_receives_gap_events(self):
         """先注册新订阅后，空窗内 emit 的事件被新订阅完整接收（不被丢弃）；
         旧订阅 aclose 后新订阅继续持有事件队列。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen1 = bus.subscribe("token")
@@ -15871,8 +15871,8 @@ class TestRound16StatsUnit:
         """stats() 内先 cleanup 回收 stream/state/knowledge 三类过期条目，
         统计只含未过期条目，且过期条目被物理删除（非仅过滤）。"""
         import json
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(
@@ -15921,8 +15921,8 @@ class TestRound16StatsUnit:
         """stats() 的 cleanup 作用于全部后端（多个 db 文件），统计前回收
         每个后端中的过期条目。"""
         import json
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         a_path = str(tmp_path / "a.db")
         b_path = str(tmp_path / "b.db")
@@ -15972,7 +15972,7 @@ class TestRound16TTLAccessSplitE2E:
     async def test_e2e_all_three_access_ttls_sqlite(self, tmp_path):
         """YAML 中 stream/knowledge 短 TTL、state 长 TTL：过期后 stream 与
         knowledge 被过滤、state 持久——三类 access 各自独立过期。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r16_ttl_all.yaml"
         yaml_path.write_text(
@@ -16025,9 +16025,9 @@ class TestRound16BackendWiringE2E:
     async def test_e2e_file_stream_and_sqlite_state_same_scope(self, tmp_path):
         """YAML：stream 用 file（短 TTL）+ state 用 sqlite（长 TTL）——
         stream 后端为 FileBackend 且过期被过滤，state 后端为 SQLiteBackend 且持久。"""
-        from weave.memory.manager import MemoryManager
-        from weave.memory.backends.file import FileBackend
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         mem_dir = (tmp_path / "mem").as_posix()
         yaml_path = tmp_path / "r16_mixed.yaml"
@@ -16073,7 +16073,7 @@ class TestRound16StateGetAllNoneE2E:
     async def test_e2e_get_all_none_narrow_delete_reveals_wide(self, tmp_path):
         """经 YAML narrow/wide scope 全链路：窄 scope 删除某 key 后，
         get_all(None) 返回宽 scope 的同 key 值。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r16_state.yaml"
         yaml_path.write_text(
@@ -16116,7 +16116,7 @@ class TestRound16SubscriptionRebuildE2E:
     @pytest.mark.asyncio
     async def test_e2e_rebuild_gap_count_never_zero_and_events_kept(self):
         """重建期间订阅计数 1→2→1 且空窗事件被新订阅完整接收，退订后无残留。"""
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen1 = bus.subscribe("token")
@@ -16147,7 +16147,7 @@ class TestRound16StatsE2E:
     async def test_e2e_stats_cleanup_all_access_types(self, tmp_path):
         """YAML 短 TTL stream/knowledge + 长 TTL state：stats() 内 cleanup
         回收过期 stream/knowledge 条目，统计只含持久 state，过期数据被物理移除。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         yaml_path = tmp_path / "r16_stats.yaml"
         yaml_path.write_text(
@@ -16256,7 +16256,7 @@ class TestRound17ChromaKnowledgeTTLUnit:
         以 4 个位置参数调用时抛 TypeError（review round-7 issue 1）。
         """
         import inspect
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         sig = inspect.signature(ChromaBackend.knowledge_add)
         assert "ttl" in sig.parameters
@@ -16264,7 +16264,7 @@ class TestRound17ChromaKnowledgeTTLUnit:
     def test_knowledge_add_with_ttl_sets_expires_at_in_metadata(self):
         """带 ttl 写入时 metadata 应记录 _expires_at（created_at+ttl），
         与 SQLite/File 后端契约一致（None=永不过期）。"""
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         backend = ChromaBackend(":memory:")
         backend._client = _FakeChromaClient()
@@ -16283,7 +16283,7 @@ class TestRound17ChromaKnowledgeTTLUnit:
 
     def test_knowledge_add_without_ttl_no_expires_at(self):
         """不带 ttl 写入时 metadata 不应含 _expires_at（永不过期契约）。"""
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         backend = ChromaBackend(":memory:")
         backend._client = _FakeChromaClient()
@@ -16301,7 +16301,7 @@ class TestRound17ChromaKnowledgeTTLUnit:
         修复前 ChromaBackend.knowledge_search 不做过期过滤，ttl 形参写入的
         _expires_at 不会被读路径尊重（review round-7 issue 1）。
         """
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         backend = ChromaBackend(":memory:")
         backend._client = _FakeChromaClient()
@@ -16334,7 +16334,7 @@ class TestRound17BackendContractUnit:
         此前 FileBackend 无 close()，DELETE /agents/{name}/memory 管理面经
         MemoryManager.close() 调用时抛 AttributeError（review round-7 issue 2）。
         """
-        from weave.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.backends.file import FileBackend
 
         backend = FileBackend(str(tmp_path / "mem"))
         assert callable(backend.close)
@@ -16346,7 +16346,7 @@ class TestRound17BackendContractUnit:
         此前均缺失，配置 backend: chroma 后管理面（status()/GET/DELETE memory）
         抛 AttributeError（review round-7 issue 2）。
         """
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         backend = ChromaBackend(":memory:")
         assert callable(backend.close)
@@ -16355,7 +16355,7 @@ class TestRound17BackendContractUnit:
 
     def test_chroma_close_releases_client_reference(self):
         """close() 应释放 client 引用（_client 置 None）。"""
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         backend = ChromaBackend(":memory:")
         backend._client = _FakeChromaClient()
@@ -16364,10 +16364,10 @@ class TestRound17BackendContractUnit:
 
     def test_chroma_cleanup_expired_returns_zero_and_warns_once(self, caplog):
         """cleanup_expired() 返回 0（no-op）并仅告警一次（读路径已按 _expires_at 过滤）。"""
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         backend = ChromaBackend(":memory:")
-        with caplog.at_level(logging.WARNING, logger="weave.memory.backends.chroma"):
+        with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.memory.backends.chroma"):
             assert backend.cleanup_expired() == 0
             assert backend.cleanup_expired() == 0
 
@@ -16376,10 +16376,10 @@ class TestRound17BackendContractUnit:
 
     def test_chroma_namespace_stats_returns_empty_and_warns_once(self, caplog):
         """namespace_stats() 返回空 dict（chroma 未实现）并仅告警一次。"""
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         backend = ChromaBackend(":memory:")
-        with caplog.at_level(logging.WARNING, logger="weave.memory.backends.chroma"):
+        with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.memory.backends.chroma"):
             assert backend.namespace_stats() == {}
             assert backend.namespace_stats() == {}
 
@@ -16393,16 +16393,16 @@ class TestRound17FilePathWarningUnit:
     def test_file_backend_warns_only_on_file_style_path(self, tmp_path, caplog):
         """file 后端 path 带后缀（如 memory.db 文件式路径）时应记录告警但仍创建
         FileBackend；目录路径（无后缀）不应告警。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.file import FileBackend
 
         # 文件式路径（带后缀）→ 告警
         db_path = str(tmp_path / "memory.db")
         scopes = {"session": MemoryScopeConfig(stream={"backend": "file", "path": db_path})}
         manager = MemoryManager(MemoryConfig(scopes=scopes, default_path=":memory:"))
 
-        with caplog.at_level(logging.WARNING, logger="weave.memory.manager"):
+        with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.memory.manager"):
             backend = manager._get_backend_for_namespace("session:s1:stream")
 
         assert isinstance(backend, FileBackend)
@@ -16414,7 +16414,7 @@ class TestRound17FilePathWarningUnit:
         scopes2 = {"session": MemoryScopeConfig(stream={"backend": "file", "path": dir_path})}
         manager2 = MemoryManager(MemoryConfig(scopes=scopes2, default_path=":memory:"))
 
-        with caplog.at_level(logging.WARNING, logger="weave.memory.manager"):
+        with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.memory.manager"):
             manager2._get_backend_for_namespace("session:s1:stream")
 
         assert not any("looks like a file path" in r.message for r in caplog.records)
@@ -16432,8 +16432,8 @@ class TestRound17ChromaTTLE2E:
     async def test_e2e_chroma_knowledge_ttl_full_chain(self, tmp_path):
         """manager.knowledge.add 按 scope ttl 计算 _expires_at；过期后查询过滤，
         未过期条目正常命中（第17轮修复项1 全链路）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(
@@ -16484,8 +16484,8 @@ class TestRound17ChromaTTLE2E:
     async def test_e2e_chroma_search_all_collections_filters_expired(self, tmp_path):
         """manager.knowledge.search(namespaces=None) 列出全部 chroma collection，
         跨 collection 过滤过期条目。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(
@@ -16526,8 +16526,8 @@ class TestRound17BackendManagementE2E:
     async def test_e2e_chroma_stats_and_close_no_crash(self, tmp_path, caplog):
         """chroma 后端下 manager.stats()（cleanup + namespace_stats）与 close()
         不抛 AttributeError，stats 排除 chroma namespace、close 清空 backend 缓存。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         manager = MemoryManager(MemoryConfig(scopes={
             "session": MemoryScopeConfig(
@@ -16539,7 +16539,7 @@ class TestRound17BackendManagementE2E:
         backend._client = _FakeChromaClient()
         await manager.knowledge.add("data", ns)
 
-        with caplog.at_level(logging.WARNING, logger="weave.memory.backends.chroma"):
+        with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.memory.backends.chroma"):
             stats = manager.stats()
             assert stats == {}, "chroma 未实现 namespace_stats → stats 不含 chroma 计数"
 
@@ -16550,9 +16550,9 @@ class TestRound17BackendManagementE2E:
     def test_e2e_file_backend_close_via_manager(self, tmp_path):
         """file 后端下 manager.close() 正常工作（FileBackend.close 为 no-op），
         并清空后端缓存。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.file import FileBackend
 
         mem_dir = str(tmp_path / "mem")
         manager = MemoryManager(MemoryConfig(scopes={
@@ -16571,8 +16571,8 @@ class TestRound17FilePathWarningE2E:
     def test_e2e_file_backend_path_warning_behavior_via_yaml(self, tmp_path, caplog):
         """YAML 配置 file 后端 + 文件式 path（如 memory.db）→ load_config →
         MemoryManager 创建 backend 时记录告警；目录 path（无后缀）不告警。"""
-        from weave.memory.manager import MemoryManager
-        from weave.memory.backends.file import FileBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.backends.file import FileBackend
 
         # 文件式路径（带后缀）→ 告警
         mem_dir = (tmp_path / "mem").as_posix()
@@ -16593,7 +16593,7 @@ class TestRound17FilePathWarningE2E:
         config = load_config(yaml_path)
         manager = MemoryManager(config.memory)
 
-        with caplog.at_level(logging.WARNING, logger="weave.memory.manager"):
+        with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.memory.manager"):
             backend = manager._get_backend_for_namespace("session:s1:stream")
 
         assert isinstance(backend, FileBackend)
@@ -16619,7 +16619,7 @@ class TestRound17FilePathWarningE2E:
         config2 = load_config(yaml_path2)
         manager2 = MemoryManager(config2.memory)
 
-        with caplog.at_level(logging.WARNING, logger="weave.memory.manager"):
+        with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.memory.manager"):
             manager2._get_backend_for_namespace("session:s1:stream")
 
         assert not any("looks like a file path" in r.message for r in caplog.records)
@@ -16655,17 +16655,17 @@ class TestRound18BakCleanupUnit:
 
     def test_memory_manager_py_bak_removed(self):
         """weave/memory/manager.py.bak 应已删除（weave/ 内 3 个之一）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "manager.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "manager.py.bak").exists(), \
             "weave/memory/manager.py.bak 应已清理"
 
     def test_memory_backends_chroma_py_bak_removed(self):
         """weave/memory/backends/chroma.py.bak 应已删除（第17轮修复 write_file 自动备份遗留）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "backends" / "chroma.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends" / "chroma.py.bak").exists(), \
             "weave/memory/backends/chroma.py.bak 应已清理"
 
     def test_memory_backends_file_py_bak_removed(self):
         """weave/memory/backends/file.py.bak 应已删除（第17轮修复 write_file 自动备份遗留）。"""
-        assert not (self.PROJECT_ROOT / "weave" / "memory" / "backends" / "file.py.bak").exists(), \
+        assert not (self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends" / "file.py.bak").exists(), \
             "weave/memory/backends/file.py.bak 应已清理"
 
     def test_nexus_fix_record_md_bak_removed(self):
@@ -16685,13 +16685,13 @@ class TestRound18BakCleanupUnit:
 
     def test_weave_memory_tree_no_bak(self):
         """weave/memory/ 整棵树（含 backends/）递归扫描不应存在任何 .bak 文件。"""
-        memory_dir = self.PROJECT_ROOT / "weave" / "memory"
+        memory_dir = self.PROJECT_ROOT / "weave_agent_sdk" / "memory"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in memory_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/memory/ 残留 .bak: {bak_files}"
 
     def test_weave_package_tree_no_bak(self):
         """weave/ 源码整棵树递归扫描不应存在任何 .bak 文件（含 memory/backends）。"""
-        weave_dir = self.PROJECT_ROOT / "weave"
+        weave_dir = self.PROJECT_ROOT / "weave_agent_sdk"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in weave_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/ 源码树残留 .bak: {bak_files}"
 
@@ -16703,7 +16703,7 @@ class TestRound18BakCleanupUnit:
 
     def test_memory_backends_dir_clean(self):
         """weave/memory/backends/ 目录内不应存在任何 .bak 文件。"""
-        backends_dir = self.PROJECT_ROOT / "weave" / "memory" / "backends"
+        backends_dir = self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in backends_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/memory/backends 残留 .bak: {bak_files}"
 
@@ -16716,9 +16716,9 @@ class TestRound18BakCleanupE2E:
     def test_e2e_round18_cleaned_files_absent_anywhere(self):
         """本轮清理的 6 个 .bak 文件应全部从项目中消失（已知路径逐一验证）。"""
         known_paths = [
-            self.PROJECT_ROOT / "weave" / "memory" / "manager.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "backends" / "chroma.py.bak",
-            self.PROJECT_ROOT / "weave" / "memory" / "backends" / "file.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "manager.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends" / "chroma.py.bak",
+            self.PROJECT_ROOT / "weave_agent_sdk" / "memory" / "backends" / "file.py.bak",
             self.PROJECT_ROOT / "nexus" / "fix_record.md.bak",
             self.PROJECT_ROOT / "nexus" / "review_record.md.bak",
             self.PROJECT_ROOT / "nexus" / "test_record.md.bak",
@@ -16733,7 +16733,7 @@ class TestRound18BakCleanupE2E:
 
     def test_e2e_no_bak_in_weave_source_tree(self):
         """weave/ 源码整棵树递归扫描不应存在任何 .bak 文件。"""
-        weave_dir = self.PROJECT_ROOT / "weave"
+        weave_dir = self.PROJECT_ROOT / "weave_agent_sdk"
         bak_files = [str(p.relative_to(self.PROJECT_ROOT)) for p in weave_dir.rglob("*.bak")]
         assert bak_files == [], f"weave/ 源码树残留 .bak: {bak_files}"
 
@@ -16791,7 +16791,7 @@ class TestRound19TwoStageBridgeR2Unit:
         to_feedback 同类）。
         """
         import inspect
-        import weave.features.two_stage as ts
+        import weave_agent_sdk.features.two_stage as ts
 
         source = inspect.getsource(ts)
         # 应从模板加载桥接指令，而非硬编码可执行指令
@@ -16804,7 +16804,7 @@ class TestRound19TwoStageBridgeR2Unit:
     async def test_two_stage_bridge_uses_template_with_understanding(self):
         """two_stage_call 的 stage2 user 桥接指令应来自模板，且注入 Stage1 理解结果。"""
         from types import SimpleNamespace
-        import weave.features.two_stage as ts
+        import weave_agent_sdk.features.two_stage as ts
 
         async def fake_chat(messages, **kwargs):
             return SimpleNamespace(content="understanding: book a flight")
@@ -16834,7 +16834,7 @@ class TestRound19TopKConfigUnit:
 
     def test_loop_config_memory_knowledge_topk_default_and_custom(self):
         """LoopConfig.memory_knowledge_topk 默认 5，且可自定义。"""
-        from weave.types import LoopConfig
+        from weave_agent_sdk.types import LoopConfig
 
         cfg = LoopConfig()
         assert cfg.memory_knowledge_topk == 5
@@ -16886,7 +16886,7 @@ class TestRound19DefaultSharedDBUnit:
 
     def test_default_path_is_memory_db(self):
         """默认（无 memory 段）下 MemoryConfig.default_path 统一为 memory.db。"""
-        from weave.types import MemoryConfig
+        from weave_agent_sdk.types import MemoryConfig
 
         # 统一 memory.db：代码默认（不写 memory 段时的兜底路径）
         # 默认数据目录改为 .weave/（docs/issues/012 路径规范化，隐藏目录）
@@ -16895,8 +16895,8 @@ class TestRound19DefaultSharedDBUnit:
     @pytest.mark.asyncio
     async def test_manager_three_access_share_single_sqlite_backend(self, tmp_path):
         """MemoryManager 下 stream/state/knowledge 同 path → 共享同一 SQLiteBackend 实例。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         db = str(tmp_path / "mem" / "memory.db")
         manager = MemoryManager(MemoryConfig(scopes={
@@ -16931,7 +16931,7 @@ class TestRound19SubscriptionGCUnit:
     def test_subscribe_uses_weakref_finalize_for_gc(self):
         """event_bus.py 应通过 weakref.finalize 在被遗弃订阅 GC 时确定性退订。"""
         import inspect
-        import weave.event_bus as eb
+        import weave_agent_sdk.event_bus as eb
 
         source = inspect.getsource(eb)
         assert "import weakref" in source
@@ -16941,7 +16941,7 @@ class TestRound19SubscriptionGCUnit:
     async def test_abandoned_generator_gc_unsubscribes(self):
         """被遗弃（不迭代、不 aclose）的订阅在 GC 后应确定性退订，不残留队列。"""
         import gc
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen = bus.subscribe("token", "done")
@@ -16960,9 +16960,9 @@ class TestRound19BackendNoPathChromaUnit:
 
     def test_ensure_configured_backends_no_path_uses_default(self, tmp_path):
         """无显式 path 配置的 scope 后端应回退 default_path 被 _ensure_configured_backends 实例化。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         db = str(tmp_path / "mem" / "memory.db")
         manager = MemoryManager(MemoryConfig(
@@ -16981,9 +16981,9 @@ class TestRound19BackendNoPathChromaUnit:
 
     def test_ensure_configured_backends_chroma_safe_without_chromadb(self, caplog):
         """chroma knowledge 后端在无参路径扫尾中被安全实例化/跳过，不因缺少 chromadb 崩溃。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         manager = MemoryManager(MemoryConfig(
             scopes={"session": MemoryScopeConfig(
@@ -17016,7 +17016,7 @@ class TestRound19TwoStageBridgeE2E:
     async def test_e2e_two_stage_bridge_template_full_chain(self):
         """真实 two_stage_bridge.md 模板存在且渲染理解结果；two_stage_call 全链路
         以模板渲染结果作为 stage2 桥接指令（非硬编码）。"""
-        from weave.features._prompts import feature_prompt
+        from weave_agent_sdk.features._prompts import feature_prompt
 
         # 真实模板文件存在（R2：桥接指令不再硬编码在 two_stage.py）
         bridge_path = Path(__file__).parent.parent / "prompts" / "features" / "two_stage_bridge.md"
@@ -17029,7 +17029,7 @@ class TestRound19TwoStageBridgeE2E:
 
         # two_stage_call 全链路：真实模板渲染结果传给 structured_call
         from types import SimpleNamespace
-        import weave.features.two_stage as ts
+        import weave_agent_sdk.features.two_stage as ts
 
         async def fake_chat(messages, **kwargs):
             return SimpleNamespace(content="understanding: search books")
@@ -17085,7 +17085,7 @@ class TestRound19DefaultSharedDBE2E:
     async def test_e2e_three_access_share_memory_db_full_chain(self, tmp_path):
         """YAML 三种 access 同 path → load_config → MemoryManager：
         三类写入落在同一 db 文件（同一 backend），stats 可见全部。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         db = (tmp_path / "data" / "memory.db").as_posix()
         yaml_path = tmp_path / "r19_shared_db.yaml"
@@ -17135,7 +17135,7 @@ class TestRound19SubscriptionGCE2E:
     @pytest.mark.asyncio
     async def test_e2e_abandoned_subscription_no_broadcast_leak(self):
         import gc
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen = bus.subscribe("token")
@@ -17168,9 +17168,9 @@ class TestRound19BackendNoPathChromaE2E:
         """YAML 中 sqlite（无 path）与 chroma knowledge 后端经 load_config →
         MemoryManager：无 path 回退 default_path 实例化、chroma 安全跳过，
         cleanup/stats 全程不崩溃。"""
-        from weave.memory.manager import MemoryManager
-        from weave.memory.backends.sqlite import SQLiteBackend
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         default_db = (tmp_path / "data" / "memory.db").as_posix()
         yaml_path = tmp_path / "r19_no_path.yaml"
@@ -17232,7 +17232,7 @@ class TestRound20TwoStageBridgeUnit:
         system 模板加载；bridge 模板仍恒加载（R2 不硬编码）；stage1 user 消息
         为 understand_prompt + input。"""
         from types import SimpleNamespace
-        import weave.features.two_stage as ts
+        import weave_agent_sdk.features.two_stage as ts
 
         captured = {}
 
@@ -17270,7 +17270,7 @@ class TestRound20TwoStageBridgeUnit:
     async def test_max_retries_propagated_to_structured_call(self):
         """two_stage_call 的 max_retries 应透传给 structured_call（默认模板路径）。"""
         from types import SimpleNamespace
-        import weave.features.two_stage as ts
+        import weave_agent_sdk.features.two_stage as ts
 
         async def fake_chat(messages, **kwargs):
             return SimpleNamespace(content="understanding: x")
@@ -17351,8 +17351,8 @@ class TestRound20DefaultSharedDBUnit:
     async def test_shared_db_read_path_visibility_across_access(self, tmp_path):
         """共用同一 memory.db 时，stream/state/knowledge 三类读路径（last/get/search）
         在同一后端上均可见（单文件内三类数据读回，不止于 stats 计数）。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         db = str(tmp_path / "mem" / "memory.db")
         manager = MemoryManager(MemoryConfig(scopes={
@@ -17387,7 +17387,7 @@ class TestRound20SubscriptionGCUnit:
     async def test_multiple_abandoned_subscriptions_all_unsubscribed_on_gc(self):
         """多个被遗弃订阅在 GC 后应全部确定性退订，不残留任何事件类型队列。"""
         import gc
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         g1 = bus.subscribe("token")
@@ -17403,7 +17403,7 @@ class TestRound20SubscriptionGCUnit:
     async def test_aclose_then_gc_is_idempotent(self):
         """显式 aclose 退订后再 GC，finalize 兜底重复退订仍安全（幂等、无异常）。"""
         import gc
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen = bus.subscribe("token")
@@ -17427,9 +17427,9 @@ class TestRound20BackendNoPathChromaUnit:
     def test_ensure_configured_backends_instantiates_all_access_types_no_path(self, tmp_path):
         """无显式 path 的 stream/state/knowledge 三 scope 由 _ensure_configured_backends
         回退 default_path 实例化，且三类 access 共享同一 SQLiteBackend。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
-        from weave.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 
         db = str(tmp_path / "mem" / "memory.db")
         manager = MemoryManager(MemoryConfig(
@@ -17453,8 +17453,8 @@ class TestRound20BackendNoPathChromaUnit:
 
     def test_ensure_configured_backends_failure_isolated(self, tmp_path):
         """个别 namespace 后端实例化失败（异常）不阻断其他 namespace 后端创建。"""
-        from weave.memory.manager import MemoryManager
-        from weave.types import MemoryConfig, MemoryScopeConfig
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig
 
         db = str(tmp_path / "mem" / "memory.db")
         manager = MemoryManager(MemoryConfig(
@@ -17492,7 +17492,7 @@ class TestRound20TwoStageBridgeE2E:
     async def test_e2e_bridge_template_placeholder_and_explicit_understand_override(self):
         """真实 two_stage_bridge.md 模板含 {{ understanding }} 占位符并被插值；
         显式 understand_system 只覆盖 stage1 system，stage2 桥接仍来自模板。"""
-        from weave.features._prompts import feature_prompt_raw, feature_prompt
+        from weave_agent_sdk.features._prompts import feature_prompt_raw, feature_prompt
 
         raw = feature_prompt_raw("two_stage_bridge")
         assert "{{ understanding }}" in raw, "模板应含插值占位符（R2 不硬编码最终指令）"
@@ -17502,7 +17502,7 @@ class TestRound20TwoStageBridgeE2E:
         assert "{{ understanding }}" not in rendered
 
         from types import SimpleNamespace
-        import weave.features.two_stage as ts
+        import weave_agent_sdk.features.two_stage as ts
 
         captured = {}
 
@@ -17559,7 +17559,7 @@ class TestRound20DefaultSharedDBE2E:
     async def test_e2e_shared_db_read_path_full_chain(self, tmp_path):
         """YAML 三种 access 同 path → load_config → MemoryManager：三类写入在同一
         文件内经读路径（last/get/search）全部可见，且新 manager（跨运行）仍可读。"""
-        from weave.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.manager import MemoryManager
 
         db = (tmp_path / "data" / "memory.db").as_posix()
         yaml_path = tmp_path / "r20_shared_db.yaml"
@@ -17610,7 +17610,7 @@ class TestRound20SubscriptionGCE2E:
     @pytest.mark.asyncio
     async def test_e2e_abandoned_multi_type_subscription_gc_no_leak(self):
         import gc
-        from weave.event_bus import EventBus
+        from weave_agent_sdk.event_bus import EventBus
 
         bus = EventBus()
         gen = bus.subscribe("token", "done", "error")
@@ -17643,9 +17643,9 @@ class TestRound20BackendNoPathChromaE2E:
         """YAML 中 stream/state 无 path（回退 default_path 共享 sqlite）+ knowledge 用
         chroma：_ensure_configured_backends 全量实例化，stream/state 共享同一默认后端、
         chroma 惰性创建，state 写入与 cleanup/stats 全程不崩溃。"""
-        from weave.memory.manager import MemoryManager
-        from weave.memory.backends.sqlite import SQLiteBackend
-        from weave.memory.backends.chroma import ChromaBackend
+        from weave_agent_sdk.memory.manager import MemoryManager
+        from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
+        from weave_agent_sdk.memory.backends.chroma import ChromaBackend
 
         default_db = (tmp_path / "data" / "memory.db").as_posix()
         yaml_path = tmp_path / "r20_no_path.yaml"

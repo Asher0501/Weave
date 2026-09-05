@@ -9,13 +9,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from weave import Weave, register_llm, register_loop, register_memory_backend
-from weave.llm.base import BaseLLM, LLMResponse
-from weave.llm.factory import LLM_REGISTRY, create_llm
-from weave.loop.base import BaseLoop
-from weave.loop.factory import LOOP_REGISTRY
-from weave.memory.manager import BACKEND_REGISTRY, MemoryManager
-from weave.types import LoopResult, MemoryConfig, MemoryScopeConfig
+from weave_agent_sdk import Weave, register_llm, register_loop, register_memory_backend
+from weave_agent_sdk.llm.base import BaseLLM, LLMResponse
+from weave_agent_sdk.llm.factory import LLM_REGISTRY, create_llm
+from weave_agent_sdk.loop.base import BaseLoop
+from weave_agent_sdk.loop.factory import LOOP_REGISTRY
+from weave_agent_sdk.memory.manager import BACKEND_REGISTRY, MemoryManager
+from weave_agent_sdk.types import LoopResult, MemoryConfig, MemoryScopeConfig
 
 
 # ── 测试替身 ──────────────────────────────────────────────

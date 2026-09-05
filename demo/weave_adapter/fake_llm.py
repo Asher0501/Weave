@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from weave.llm.base import BaseLLM, LLMResponse
+from weave_agent_sdk.llm.base import BaseLLM, LLMResponse
 
 
 class FakeLLM(BaseLLM):

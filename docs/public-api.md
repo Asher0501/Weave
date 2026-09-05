@@ -9,7 +9,7 @@
 
 ## 1. 稳定公开 API（不可变）
 
-这些是外部项目 `from weave import ...` 后使用的接口，修改签名/行为会破坏下游。
+这些是外部项目 `from weave_agent_sdk import ...` 后使用的接口，修改签名/行为会破坏下游。
 
 ### 1.1 核心入口 — `Weave` 类
 
@@ -142,7 +142,7 @@ class KnowledgeMemory(ABC):  # add / search
 其名称引用（`llm.provider` / `loop.type` / scope `backend`）。
 
 ```python
-from weave import register_llm, register_loop, register_memory_backend
+from weave_agent_sdk import register_llm, register_loop, register_memory_backend
 
 register_llm("my_gateway", my_gateway_factory)      # llm.provider: my_gateway
 register_loop("human_review", HumanReviewLoop)       # loop.type: human_review

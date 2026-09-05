@@ -43,7 +43,7 @@ factory 可以是类（Loop/Backend，直接 `cls(*args)`）或工厂函数（LL
 ### 3. 公开注册 API + 实例注入
 
 ```python
-from weave import register_llm, register_loop, register_memory_backend
+from weave_agent_sdk import register_llm, register_loop, register_memory_backend
 Weave("weave.yaml", llm=..., loop=...)   # 运行期覆盖（离线/测试逃生口）
 ```
 

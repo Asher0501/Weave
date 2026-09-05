@@ -15,11 +15,11 @@ import textwrap
 
 import pytest
 
-from weave import Weave
-from weave.checkpoint import CheckpointManager
-from weave.llm.base import BaseLLM, LLMResponse
-from weave.memory.manager import MemoryManager
-from weave.types import (
+from weave_agent_sdk import Weave
+from weave_agent_sdk.checkpoint import CheckpointManager
+from weave_agent_sdk.llm.base import BaseLLM, LLMResponse
+from weave_agent_sdk.memory.manager import MemoryManager
+from weave_agent_sdk.types import (
     CheckpointConfig,
     MemoryConfig,
     MemoryScopeConfig,

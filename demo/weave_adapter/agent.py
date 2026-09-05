@@ -17,7 +17,7 @@ from business.models import (
     PersonaAnswer,
     PersonaMemorySnapshot,
 )
-from weave.agent import Weave
+from weave_agent_sdk.agent import Weave
 
 
 class PersonaAgent:

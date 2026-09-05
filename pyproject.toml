@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "weave"
+name = "weave-agent-sdk"
 dynamic = ["version"]
 description = "Non-intrusive Agent SDK with pluggable Loop and Memory mechanisms"
 readme = "README.md"
@@ -35,7 +35,7 @@ Repository = "https://github.com/weave-contributors/weave"
 Documentation = "https://github.com/weave-contributors/weave#readme"
 
 [project.scripts]
-weave = "weave.cli:main"
+weave = "weave_agent_sdk.cli:main"
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.39.0"]
@@ -52,11 +52,11 @@ all = [
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "weave.__version__"}
+version = {attr = "weave_agent_sdk.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
 exclude = ["tests*", "examples*"]
 
 [tool.setuptools.package-data]
-weave = ["prompts/defaults/*.md", "py.typed"]
+weave_agent_sdk = ["prompts/defaults/*.md", "py.typed"]

@@ -142,7 +142,7 @@ Python SDK 和 REST API 暴露**同一抽象层级**的概念。你在代码里�
 
 ```python
 # SDK 方式 - 在宿主项目中
-from weave import Weave
+from weave_agent_sdk import Weave
 weave = Weave("weave.yaml")
 result = weave.run("我应该学什么?")
 ```
@@ -701,7 +701,7 @@ prompt:
 Tools 由宿主项目定义，Weave 不内置任何 Tool：
 
 ```python
-from weave import Weave
+from weave_agent_sdk import Weave
 
 weave = Weave("weave.yaml")
 
@@ -790,7 +790,7 @@ except Exception as e:
 从 LLM 返回的文本中提取 JSON。处理 markdown 代码围栏、自然语言混排、格式错误。两个参考项目各自复制粘贴了 4 次。
 
 ```python
-from weave.llm import extract_json
+from weave_agent_sdk.llm import extract_json
 
 # LLM 返回: "好的，结果如下:\n```json\n{"city":"北京"}\n```\n希望对你有帮助"
 data = extract_json(response)  # → {"city": "北京"}
@@ -801,7 +801,7 @@ data = extract_json(response)  # → {"city": "北京"}
 指数退避 + 随机 jitter，可配置哪些异常可重试。两个项目都没有此能力，LLM 调用失败要么 crash 要么静默返回错误数据。
 
 ```python
-from weave.utils import retry
+from weave_agent_sdk.utils import retry
 
 @retry(max_attempts=3, backoff=2.0, jitter=0.1, retryable={RateLimitError, ServerError})
 async def call_llm(prompt): ...
@@ -814,7 +814,7 @@ async def call_llm(prompt): ...
 为外部调用设置截止时间。两个项目的 LLM 调用都没有 timeout，网络挂掉会无限等待。
 
 ```python
-from weave.utils import timeout
+from weave_agent_sdk.utils import timeout
 
 async with timeout(30):  # 30 秒
     result = await llm.chat(prompt)
@@ -859,7 +859,7 @@ await weave.emit("tool_called", {"name": "search_kb", "args": {...}})
 用 Pydantic model 校验 LLM 提取出的 dict，返回结构化错误。两个项目都用手写 `.get()` 兜底，静默吞错。
 
 ```python
-from weave.features import extract_and_validate
+from weave_agent_sdk.features import extract_and_validate
 
 class WeatherQuery(BaseModel):
     city: str
@@ -881,7 +881,7 @@ features:
 A1 + B1 + A2 的组合：调 LLM → 提取 JSON → Schema 校验 → 失败时把错误喂回 LLM 重试。bePM 将这个循环复制粘贴了 4 次。
 
 ```python
-from weave.features import structured_call
+from weave_agent_sdk.features import structured_call
 
 result = await structured_call(
     prompt="分析用户输入: {...}",
@@ -901,7 +901,7 @@ features:
 bePM 的最精彩设计：拆成"意图理解"（无 Schema 约束 → 自由表达）→ "翻译"（Schema 约束 → 精准 JSON），大幅提升结构化输出准确率。
 
 ```python
-from weave.features import two_stage_call
+from weave_agent_sdk.features import two_stage_call
 
 result = await two_stage_call(
     understand_prompt="理解用户想对项目做什么操作",
@@ -920,7 +920,7 @@ features:
 截断 + 正则检测注入模式 + 防御策略。来自 bePM 的 `sanitize_user_input`。
 
 ```python
-from weave.features import sanitize
+from weave_agent_sdk.features import sanitize
 
 safe_text = sanitize(user_input, max_length=2000, strategy="defend")
 ```
@@ -995,7 +995,7 @@ weave/                              # Git 仓库根目录
 │
 ├── weave/                          # Python 包
 │   ├── __init__.py                 # 公共 API 导出
-│   │   from weave import Weave
+│   │   from weave_agent_sdk import Weave
 │   │   weave = Weave("config.yaml")
 │   │
 │   ├── agent.py                    # Weave 类 — 核心编排器
@@ -1082,7 +1082,7 @@ weave/                              # Git 仓库根目录
 ### 6.1 run() 完整签名
 
 ```python
-from weave import Weave
+from weave_agent_sdk import Weave
 
 weave = Weave("weave.yaml")
 
@@ -1109,7 +1109,7 @@ result = weave.run(
 
 ```python
 # main.py
-from weave import Weave
+from weave_agent_sdk import Weave
 
 weave = Weave("weave.yaml")
 
@@ -1143,7 +1143,7 @@ memory:
 
 ```python
 # mykg_agent.py
-from weave import Weave
+from weave_agent_sdk import Weave
 from backend.engine.topology import topological_sort_with_depth
 from backend.models.graph import KnowledgeBase
 
@@ -1229,7 +1229,7 @@ prompts:
 
 ```python
 # bepm_agent.py
-from weave import Weave
+from weave_agent_sdk import Weave
 from backend.engine.scheduler import calculate_schedule
 from backend.engine.parser import analyze_risks
 
@@ -1305,7 +1305,7 @@ prompts:
 $ weave serve --config weave.yaml --port 48080
 
 # 或程序化
-from weave.server import create_app
+from weave_agent_sdk.server import create_app
 app = create_app(weave)
 ```
 
@@ -1579,7 +1579,7 @@ logging:
 |------|-------------------|--------------|
 | **Loop** | 纯响应式，无迭代 | 3 种策略：Simple/Iterative/Scheduled |
 | **Memory** | JSON 文件 + 内存 dict | 按访问模式：stream/state/knowledge，作用域自定义，namespace 隔离 |
-| **集成方式** | REST API，无 pip 包 | `pip install` + `from weave import Weave` |
+| **集成方式** | REST API，无 pip 包 | `pip install` + `from weave_agent_sdk import Weave` |
 | **配置** | 部分 env var，部分硬编码 | 全部 YAML + env var 注入，模板语法 `${VAR:-default}` |
 | **Prompt** | 代码中硬编码（myKG）/ 部分外置（bePM） | 100% 外置 .md 文件，模板变量 |
 | **LLM 适配** | 手动选择 | 自动检测（env → claude settings → 默认） |
