@@ -13,7 +13,7 @@
 8. .bak 备份文件清理验证
 
 覆盖第3轮修复的4个修复项:
-9. 共享 load_claude_env() 工具函数
+9. （已移除）load_claude_env 工具函数
 10. tests/ 下 .bak 文件清理验证
 11. 默认 weave.yaml 配置文件存在性验证
 12. stream() 超时值可配置验证
@@ -61,7 +61,6 @@ import pytest
 from weave_agent_sdk.agent import Weave
 from weave_agent_sdk.config import _resolve_env, load_config
 from weave_agent_sdk.types import LoopResult
-from weave_agent_sdk.utils.env import load_claude_env
 
 
 # ============================================================
@@ -356,97 +355,6 @@ class TestRunStateTracking:
         assert status["memory_stats"]["by_scope"] == {"test:scope:stream": 3}
 
 
-# ============================================================
-# 修复项 4: config 异常处理 — 静默吞异常改为日志告警
-# ============================================================
-
-
-class TestConfigExceptionHandling:
-    """测试 load_claude_env() 的异常处理（共享工具函数 weave.utils.env）。"""
-
-    @pytest.fixture
-    def mock_settings_path(self, tmp_path, mocker):
-        """mock Path.home() 指向临时目录。"""
-        home = tmp_path / "home"
-        home.mkdir(parents=True, exist_ok=True)
-        claude_dir = home / ".claude"
-        claude_dir.mkdir(parents=True, exist_ok=True)
-        settings_path = claude_dir / "settings.json"
-        mocker.patch.object(Path, "home", return_value=home)
-        return settings_path
-
-    def test_file_not_found_silent(self, mock_settings_path, caplog):
-        """FileNotFoundError 应静默通过（settings.json 不存在是正常情况）。"""
-        # 确保文件不存在
-        assert not mock_settings_path.exists()
-
-        with caplog.at_level(logging.WARNING):
-            load_claude_env()
-
-        # 不应有警告日志
-        assert len(caplog.records) == 0
-
-    def test_json_decode_error_logs_warning(self, mock_settings_path, caplog):
-        """JSONDecodeError 应记录 logger.warning。"""
-        mock_settings_path.write_text("invalid json content", encoding="utf-8")
-        assert mock_settings_path.exists()
-
-        with caplog.at_level(logging.WARNING):
-            load_claude_env()
-
-        assert len(caplog.records) >= 1
-        assert any("JSON" in r.message or "parse" in r.message.lower() for r in caplog.records)
-
-    def test_permission_error_logs_warning(self, mock_settings_path, caplog, mocker):
-        """PermissionError 应记录 logger.warning。"""
-        mock_settings_path.write_text('{"env": {"KEY": "val"}}', encoding="utf-8")
-        assert mock_settings_path.exists()
-
-        # Mock Path.read_text at class level
-        mocker.patch.object(Path, "read_text", side_effect=PermissionError("Access denied"))
-
-        with caplog.at_level(logging.WARNING):
-            load_claude_env()
-
-        assert len(caplog.records) >= 1
-        assert any("Permission" in r.message for r in caplog.records)
-
-    def test_generic_exception_logs_warning(self, mock_settings_path, caplog, mocker):
-        """兜底 Exception 应记录 logger.warning。"""
-        mock_settings_path.write_text('{"env": {"KEY": "val"}}', encoding="utf-8")
-        assert mock_settings_path.exists()
-
-        mocker.patch.object(Path, "read_text", side_effect=RuntimeError("Unexpected error"))
-
-        with caplog.at_level(logging.WARNING):
-            load_claude_env()
-
-        assert len(caplog.records) >= 1
-        assert any("Unexpected" in r.message or "unexpected" in r.message.lower() for r in caplog.records)
-
-    def test_successful_load_no_warnings(self, mock_settings_path, caplog):
-        """正常加载 settings.json 不应产生告警。"""
-        mock_settings_path.write_text(
-            json.dumps({"env": {"MY_KEY": "my_value"}}), encoding="utf-8"
-        )
-        assert mock_settings_path.exists()
-
-        with caplog.at_level(logging.WARNING):
-            load_claude_env()
-
-        assert len(caplog.records) == 0
-        assert os.environ.get("MY_KEY") == "my_value"
-
-    def test_env_not_overwritten(self, mock_settings_path):
-        """load_claude_env() 不应覆盖已存在的环境变量。"""
-        os.environ["EXISTING_KEY"] = "original_value"
-        mock_settings_path.write_text(
-            json.dumps({"env": {"EXISTING_KEY": "new_value"}}), encoding="utf-8"
-        )
-
-        load_claude_env()
-
-        assert os.environ["EXISTING_KEY"] == "original_value"
 
 
 # ============================================================
@@ -719,53 +627,6 @@ class TestBakFileCleanup:
         assert len(bak_files) == 0, f"Found .bak files: {bak_files}"
 
 
-# ============================================================
-# 修复项 9: 共享 load_claude_env() 工具函数（第3轮）
-# ============================================================
-
-
-class TestSharedLoadClaudeEnv:
-    """测试共享 load_claude_env() 工具函数在 config.py 和 factory.py 中一致性。"""
-
-    def test_config_imports_from_utils_env(self):
-        """config.py 应导入共享的 load_claude_env，而非本地定义。"""
-        import inspect
-        import weave_agent_sdk.config as cfg
-        # 验证 config 模块中不再有 _load_claude_env 本地定义
-        assert not hasattr(cfg, '_load_claude_env')
-        # 验证 config 确实从 utils.env 导入了
-        source = inspect.getsource(cfg)
-        assert 'from weave_agent_sdk.utils.env import load_claude_env' in source
-
-    def test_factory_imports_from_utils_env(self):
-        """factory.py 应导入共享的 load_claude_env，而非本地定义。"""
-        import inspect
-        import weave_agent_sdk.llm.factory as factory
-        # 验证 factory 模块中不再有 _load_claude_env 本地定义
-        assert not hasattr(factory, '_load_claude_env')
-        # 验证 factory 确实从 utils.env 导入了
-        source = inspect.getsource(factory)
-        assert 'from weave_agent_sdk.utils.env import load_claude_env' in source
-
-    def test_both_use_same_function(self):
-        """config.py 和 factory.py 使用相同的 load_claude_env 函数引用。"""
-        from weave_agent_sdk.config import load_config as _
-        from weave_agent_sdk.llm.factory import create_llm as _
-        from weave_agent_sdk.utils.env import load_claude_env as shared_fn
-        # 通过测试两处导入均正常工作来验证一致性
-        assert callable(shared_fn)
-
-    def test_load_claude_env_has_proper_error_handling(self):
-        """共享函数应包含完整的异常分类处理（静默 FileNotFoundError + 记录警告）。"""
-        import inspect
-        from weave_agent_sdk.utils.env import load_claude_env
-        source = inspect.getsource(load_claude_env)
-        # 应包含分类异常处理
-        assert 'FileNotFoundError' in source
-        assert 'JSONDecodeError' in source
-        assert 'PermissionError' in source
-        # 不应有静默 except Exception: pass
-        assert 'except Exception:' not in source.replace('except Exception as e:', 'EXCEPTION_WITH_LOG')
 
 
 # ============================================================
@@ -937,64 +798,6 @@ class TestStreamTimeoutConfigurable:
         assert 'timeout=5.0' not in source
 
 
-# ============================================================
-# 第3轮新增：修复项 9 — 集成测试：共享 load_claude_env 调用链
-# ============================================================
-
-
-class TestSharedLoadClaudeEnvIntegration:
-    """测试共享 load_claude_env() 在实际调用链中被正确调用。"""
-
-    def test_load_config_calls_load_claude_env(self, tmp_path):
-        """load_config() 内部应调用 load_claude_env()（通过 mock 验证调用链）。"""
-        import yaml
-        from weave_agent_sdk.config import load_config
-
-        yaml_path = tmp_path / "test_integration.yaml"
-        config_data = {
-            "agent": {"name": "test"},
-            "llm": {"provider": "anthropic"},
-            "loop": {"type": "simple"},
-            "memory": {"scopes": {}},
-            "prompts": {},
-            "features": {},
-            "server": {},
-            "logging": {},
-        }
-        with open(yaml_path, "w", encoding="utf-8") as f:
-            yaml.dump(config_data, f)
-
-        # Mock load_claude_env to verify it gets called
-        with patch("weave_agent_sdk.config.load_claude_env") as mock_load_claude_env:
-            result = load_config(yaml_path)
-            mock_load_claude_env.assert_called_once()
-
-        # Verify the config still parsed correctly
-        assert result.agent.name == "test"
-        assert result.llm.provider == "anthropic"
-        assert result.loop.type == "simple"
-
-    def test_create_llm_calls_load_claude_env(self):
-        """create_llm() 内部应调用 load_claude_env()（通过 mock 验证调用链）。
-
-        为避免环境中的真实 API Key 干扰，同时 mock _resolve_api_key 返回 None。
-        """
-        from weave_agent_sdk.llm.factory import create_llm
-
-        with patch("weave_agent_sdk.llm.factory.load_claude_env") as mock_load_claude_env:
-            # Mock _resolve_api_key to return None so create_llm raises ValueError
-            with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value=None):
-                with pytest.raises(ValueError, match="No API key"):
-                    create_llm(provider="anthropic")
-                mock_load_claude_env.assert_called_once()
-
-    def test_load_claude_env_integration_file_not_found_no_error(self):
-        """load_claude_env() 在 settings.json 不存在时不应抛出异常（集成测试）。"""
-        # This should not raise any exception even when file doesn't exist
-        try:
-            load_claude_env()
-        except Exception as e:
-            pytest.fail(f"load_claude_env() raised unexpected exception: {e}")
 
 
 # ============================================================
@@ -2921,11 +2724,10 @@ class TestFactoryDeepseekModelE2E:
         from weave_agent_sdk.llm.factory import create_llm
         with patch("weave_agent_sdk.llm.openai.OpenAIAdapter") as mock_ad:
             with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
-                    create_llm(provider="deepseek", model="custom-model")
-                    mock_ad.assert_called_once()
-                    _, kwargs = mock_ad.call_args
-                    assert kwargs.get("model") == "custom-model"
+                create_llm(provider="deepseek", model="custom-model")
+                mock_ad.assert_called_once()
+                _, kwargs = mock_ad.call_args
+                assert kwargs.get("model") == "custom-model"
 
     def test_create_llm_deepseek_default_model(self):
         from unittest.mock import patch
@@ -2936,11 +2738,10 @@ class TestFactoryDeepseekModelE2E:
         try:
             with patch("weave_agent_sdk.llm.openai.OpenAIAdapter") as mock_ad:
                 with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
-                    with patch("weave_agent_sdk.llm.factory.load_claude_env"):
-                        create_llm(provider="deepseek", model=None)
-                        mock_ad.assert_called_once()
-                        _, kwargs = mock_ad.call_args
-                        assert kwargs.get("model") == "deepseek-chat"
+                    create_llm(provider="deepseek", model=None)
+                    mock_ad.assert_called_once()
+                    _, kwargs = mock_ad.call_args
+                    assert kwargs.get("model") == "deepseek-chat"
         finally:
             if old_val is not None:
                 os.environ["DEEPSEEK_MODEL"] = old_val
@@ -3271,10 +3072,9 @@ class TestNoHardcodedModelNames:
         monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
 
         with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
-            with patch("weave_agent_sdk.llm.factory.load_claude_env"):
-                with pytest.raises(ValueError) as excinfo:
-                    create_llm(provider="anthropic")
-                assert "model" in str(excinfo.value).lower()
+            with pytest.raises(ValueError) as excinfo:
+                create_llm(provider="anthropic")
+            assert "model" in str(excinfo.value).lower()
 
 
 # ============================================================
@@ -3933,11 +3733,10 @@ class TestE2ECreateLLMFromEnv:
         monkeypatch.setenv("WEAVE_MODEL", "claude-e2e-2026")
         with patch("weave_agent_sdk.llm.anthropic.AnthropicAdapter") as mock_ad:
             with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
-                    create_llm(provider="anthropic", model=None)
-                    mock_ad.assert_called_once()
-                    _, kwargs = mock_ad.call_args
-                    assert kwargs.get("model") == "claude-e2e-2026"
+                create_llm(provider="anthropic", model=None)
+                mock_ad.assert_called_once()
+                _, kwargs = mock_ad.call_args
+                assert kwargs.get("model") == "claude-e2e-2026"
 
 
 class TestE2EAccessTypeValidation:
@@ -4204,11 +4003,10 @@ class TestR3ModelResolutionAdditional:
         monkeypatch.setenv("OPENAI_MODEL", "gpt-e2e-2026")
         with patch("weave_agent_sdk.llm.openai.OpenAIAdapter") as mock_ad:
             with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
-                    create_llm(provider="openai", model=None)
-                    mock_ad.assert_called_once()
-                    _, kwargs = mock_ad.call_args
-                    assert kwargs.get("model") == "gpt-e2e-2026"
+                create_llm(provider="openai", model=None)
+                mock_ad.assert_called_once()
+                _, kwargs = mock_ad.call_args
+                assert kwargs.get("model") == "gpt-e2e-2026"
 
     def test_anthropic_adapter_accepts_non_empty_model(self):
         """AnthropicAdapter 在传入非空 model 时应正常实例化并保存模型名。"""
@@ -4404,11 +4202,10 @@ class TestE2EModelResolutionConfigToAdapter:
 
         with patch("weave_agent_sdk.llm.anthropic.AnthropicAdapter") as mock_ad:
             with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
-                    create_llm(provider="anthropic", model=config.llm.model)
-                    mock_ad.assert_called_once()
-                    _, kwargs = mock_ad.call_args
-                    assert kwargs.get("model") == "claude-e2e-resolved-2026"
+                create_llm(provider="anthropic", model=config.llm.model)
+                mock_ad.assert_called_once()
+                _, kwargs = mock_ad.call_args
+                assert kwargs.get("model") == "claude-e2e-resolved-2026"
 
 
 # ============================================================
@@ -5152,11 +4949,10 @@ class TestRound4CreateLLMDeepseekE2E:
         monkeypatch.setenv("WEAVE_MODEL", "deepseek-e2e-2026")
         with patch("weave_agent_sdk.llm.openai.OpenAIAdapter") as mock_ad:
             with patch("weave_agent_sdk.llm.factory._resolve_api_key", return_value="test-key"):
-                with patch("weave_agent_sdk.llm.factory.load_claude_env"):
-                    create_llm(provider="deepseek", model=None)
-                    mock_ad.assert_called_once()
-                    _, kwargs = mock_ad.call_args
-                    assert kwargs.get("model") == "deepseek-e2e-2026"
+                create_llm(provider="deepseek", model=None)
+                mock_ad.assert_called_once()
+                _, kwargs = mock_ad.call_args
+                assert kwargs.get("model") == "deepseek-e2e-2026"
 
 
 # ============================================================

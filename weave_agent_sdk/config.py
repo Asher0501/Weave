@@ -17,6 +17,7 @@ import yaml
 from weave_agent_sdk.types import (
     AgentConfig,
     CheckpointConfig,
+    DEFAULT_PROVIDER,
     FeatureConfig,
     LLMConfig,
     LoggingConfig,
@@ -27,7 +28,6 @@ from weave_agent_sdk.types import (
     ServerConfig,
     WeaveConfig,
 )
-from weave_agent_sdk.utils.env import load_claude_env
 
 logger = logging.getLogger(__name__)
 
@@ -213,9 +213,8 @@ def load_config(config_path: str | Path) -> WeaveConfig:
 
     解析优先级:
     1. 环境变量（os.environ）
-    2. Claude Code settings.json
-    3. weave.yaml 文件
-    4. 代码默认值
+    2. weave.yaml 文件
+    3. 代码默认值
 
     Args:
         config_path: weave.yaml 文件路径
@@ -234,10 +233,7 @@ def load_config(config_path: str | Path) -> WeaveConfig:
     config_path = config_path.resolve()
     config_dir = config_path.parent
 
-    # 1. 加载 Claude Code env，注入 os.environ（不覆盖已设置的环境变量）
-    load_claude_env()
-
-    # 2. 读取并解析 YAML
+    # 1. 读取并解析 YAML
     raw_text = config_path.read_text(encoding="utf-8")
     # 对整份 YAML 原文做唯一一次环境变量插值。此处已覆盖全部 `${...}`
     # 占位符（含 llm 段在内），因此后续不再对任何子段二次插值——
@@ -301,7 +297,7 @@ def load_config(config_path: str | Path) -> WeaveConfig:
     return WeaveConfig(
         agent=AgentConfig(name=agent_raw.get("name", "default")),
         llm=LLMConfig(
-            provider=llm_raw.get("provider", "anthropic"),
+            provider=llm_raw.get("provider", DEFAULT_PROVIDER),
             model=model_name,
             max_tokens=int(llm_raw.get("max_tokens", 4096)),
             temperature=float(llm_raw.get("temperature", 0.7)),

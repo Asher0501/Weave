@@ -101,6 +101,10 @@ class WeaveEvent:
 
 # ── Config Types ─────────────────────────────────────────
 
+# 默认 LLM provider——单点声明，避免 types/config/factory 多处硬编码
+# "anthropic"；切换默认 provider 只需改这一处。
+DEFAULT_PROVIDER = "anthropic"
+
 
 @dataclass(slots=True)
 class LLMConfig:
@@ -108,7 +112,7 @@ class LLMConfig:
 
     model 从 weave.yaml 或环境变量读取，代码中不硬编码模型名（R3）。
     """
-    provider: str = "anthropic"       # anthropic | openai
+    provider: str = DEFAULT_PROVIDER       # anthropic | openai
     model: str = ""                   # 从 weave.yaml 或环境变量读取，不硬编码默认值
     max_tokens: int = 4096
     temperature: float = 0.7

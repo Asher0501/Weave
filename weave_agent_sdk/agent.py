@@ -48,14 +48,25 @@ class Weave:
 
     def __init__(
         self,
-        config_path: str = "weave.yaml",
+        config_path: str | Path | None = None,
         *,
+        config: WeaveConfig | None = None,
         llm: BaseLLM | None = None,
         loop: BaseLoop | None = None,
     ):
-        self._config: WeaveConfig = load_config(config_path)
-        # 配置文件目录，作为 prompts 相对路径的基准（docs/issues/012 路径规范化）
-        self._config_dir = Path(config_path).resolve().parent
+        if config is not None:
+            # 程序化构造：直接使用传入的 WeaveConfig 对象（无需落盘 yaml）
+            self._config: WeaveConfig = config
+            self._config_dir = Path.cwd()
+        elif config_path is not None:
+            # 从 YAML 文件加载
+            self._config: WeaveConfig = load_config(config_path)
+            # 配置文件目录，作为 prompts 相对路径的基准（docs/issues/012 路径规范化）
+            self._config_dir = Path(config_path).resolve().parent
+        else:
+            # 零配置：全默认值（provider 自动检测，凭证从环境变量读取）
+            self._config = WeaveConfig()
+            self._config_dir = Path.cwd()
         self._llm: BaseLLM = llm if llm is not None else create_llm(
             provider=self._config.llm.provider,
             model=self._config.llm.model,

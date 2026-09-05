@@ -4,7 +4,6 @@
 1. weave.yaml 中显式指定的 provider
 2. 环境变量 LLM_PROVIDER
 3. 智能推断: ANTHROPIC_API_KEY → anthropic, OPENAI_API_KEY → openai
-4. 从 ~/.claude/settings.json 读取（注入 os.environ 后自动感知）
 
 模型名从 weave.yaml 或环境变量读取，代码中不硬编码（R3）。
 """
@@ -15,7 +14,7 @@ from typing import Any
 
 from weave_agent_sdk.llm.base import BaseLLM
 from weave_agent_sdk.registry import Registry
-from weave_agent_sdk.utils.env import load_claude_env
+from weave_agent_sdk.types import DEFAULT_PROVIDER
 
 
 # ── LLM 注册表 ──────────────────────────────────────────
@@ -66,9 +65,6 @@ def create_llm(
     Raises:
         ValueError: 无法确定 LLM 后端、缺少 API Key 或缺少模型名
     """
-    # ── 0. 注入 Claude Code settings.json env ──
-    load_claude_env()
-
     # ── 1. 确定 provider ──
     if provider is None:
         provider = os.environ.get("LLM_PROVIDER", "").strip().lower()
@@ -112,16 +108,16 @@ def create_llm(
 
 
 def _auto_detect_provider() -> str:
-    """根据环境变量自动推断 LLM 后端（settings.json 已注入 os.environ）。"""
+    """根据环境变量自动推断 LLM 后端。"""
     if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
         return "anthropic"
     if os.environ.get("OPENAI_API_KEY"):
         return "openai"
-    return "anthropic"  # 默认
+    return DEFAULT_PROVIDER  # 默认
 
 
 def _resolve_api_key(provider: str) -> str | None:
-    """按优先级解析 API Key（settings.json 已注入 os.environ）。"""
+    """按优先级解析 API Key。"""
     if provider == "anthropic":
         return (
             os.environ.get("ANTHROPIC_API_KEY")
