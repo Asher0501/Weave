@@ -21,6 +21,9 @@ from weave.types import (
     WeaveEvent,
 )
 
+# 版本号单点声明（pyproject.toml 经 dynamic 从本处读取，见 [tool.setuptools.dynamic]）
+__version__ = "0.2.0"
+
 
 # ── 插件注册（docs/issues/010） ──────────────────────────
 # 内置实现 = 预注册默认值；宿主可注册自定义实现，并经 weave.yaml 引用
@@ -58,4 +61,5 @@ __all__ = [
     "ToolCall",
     "ToolResult",
     "WeaveEvent",
+    "__version__",
 ]

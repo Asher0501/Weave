@@ -84,6 +84,20 @@ class FileBackend:
         if len(items) > max_items:
             self._write(self._get_path(namespace, "stream"), items[-max_items:])
 
+    def stream_delete_after(self, watermark: float, namespace: str) -> int:
+        """删除 _created_at > watermark 的 stream 条目（用于状态回滚）。
+
+        与 SQLite 后端契约一致：watermark 为快照时刻 time.time()，据此删除
+        快照后新增的条目。
+        """
+        path = self._get_path(namespace, "stream")
+        items = self._read(path)
+        kept = [i for i in items if (i.get("_created_at") or 0.0) <= watermark]
+        removed = len(items) - len(kept)
+        if removed > 0:
+            self._write(path, kept)
+        return removed
+
     # ── State ─────────────────────────────────────────
 
     def state_get(self, key: str, namespace: str) -> Any | None:

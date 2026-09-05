@@ -74,6 +74,10 @@ Adapter Layer      →  LLM Adapters / Store Adapters / Prompt Loader  (可插�
 - **作用域由项目自定义**。Weave 不内置 system/project/session 层级。接入项目在 `weave.yaml` 中定义自己的 scope
 - **Namespace 隔离**：格式 `{scope_name}:{scope_id}:{access_type}`，单表行级隔离
 - **Scope 优先级**：`priority` 越小越"窄"，同 key 时窄 scope 覆盖宽 scope
+- **状态回滚 = Memory 的时间维度快照**：`checkpoint()/rollback()` 是对 state/stream
+  的快照与恢复（非新的 Memory 类型、非新 Loop 策略），只回滚 Memory 认知状态，
+  不触碰宿主外部副作用（tool 副作用回滚仅约定 reverse tool，不强制实现）。见
+  `docs/issues/012`
 
 ### 4.3 命名
 
@@ -166,6 +170,7 @@ prompts:
 | 在 Loop 中用 `len(messages)` 估算写入数 | 实际追踪写入次数 |
 | 在 `__init__.py` 导出内部实现类 | 只导出稳定公开 API |
 | 假设 `asyncio.run()` 总是可用 | 先 `get_running_loop()` 检查已有事件循环 |
+| 为回滚新增一种 Memory 类型或强制宿主提供 reverse tool | 回滚是 Memory 时间维度快照（checkpoint/rollback），tool 副作用回滚只出约定不强制 |
 
 ---
 

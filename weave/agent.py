@@ -12,6 +12,7 @@ from pathlib import Path, PurePath
 from typing import Any
 
 from weave.config import load_config
+from weave.checkpoint import CheckpointManager
 from weave.event_bus import EventBus
 from weave.llm.factory import create_llm
 from weave.llm.base import BaseLLM
@@ -53,6 +54,8 @@ class Weave:
         loop: BaseLoop | None = None,
     ):
         self._config: WeaveConfig = load_config(config_path)
+        # 配置文件目录，作为 prompts 相对路径的基准（docs/issues/012 路径规范化）
+        self._config_dir = Path(config_path).resolve().parent
         self._llm: BaseLLM = llm if llm is not None else create_llm(
             provider=self._config.llm.provider,
             model=self._config.llm.model,
@@ -61,8 +64,9 @@ class Weave:
         )
         self._event_bus = EventBus()
         self._memory = MemoryManager(self._config.memory)
+        self._checkpoint = CheckpointManager(self._memory, self._config.checkpoint)
         self._prompts = PromptRegistry(
-            base_dir="prompts",
+            base_dir=self._config_dir / "prompts",
             config=self._config,
         )
 
@@ -554,13 +558,67 @@ class Weave:
                 # 完整路径，语义与绝对路径直载一致）
                 pass
         if not path.is_absolute():
-            # 相对路径：与 registry 的 base_dir（"prompts"）一致，相对 CWD 解析
-            path = Path.cwd() / path
+            # 相对路径：相对配置文件目录解析（docs/issues/012 路径规范化），
+            # 而非 CWD——`pip install` 后从任意目录运行，prompt 落点可预期。
+            # 单元测试可能用 Weave.__new__ 绕过 __init__（无 _config_dir），
+            # 此时回退 CWD 以保持兼容。
+            base = getattr(self, "_config_dir", None) or Path.cwd()
+            path = base / path
         # 显式路径指向 .schema.yaml/.yml/.json：走 schema 渲染而非纯文本插值，
         # 否则 YAML 骨架会整段漏进 prompt（docs/issues/005）
         if is_schema_path(str(path)):
             return load_prompt_schema(path, context, self._config)
         return load_prompt(path, context, self._config)
+
+    # ── 状态回滚 ──────────────────────────────────────
+
+    def checkpoint(self) -> str:
+        """手动打一个状态快照，返回 checkpoint_id。
+
+        需在 checkpoint.enabled 之外显式调用；返回的 id 可用于 rollback()。
+        """
+        return self._run_checkpoint_coro(self._checkpoint.checkpoint())
+
+    def checkpoints(self) -> list[dict]:
+        """列出当前 session 的所有快照（按时间升序）。"""
+        return self._run_checkpoint_coro(self._checkpoint.checkpoints())
+
+    def rollback(self, checkpoint_id: str | None = None) -> str:
+        """回滚到指定快照（默认最近一个）。
+
+        Args:
+            checkpoint_id: 目标快照 id；None 表示最近一个。
+
+        Returns:
+            实际回滚到的 checkpoint_id
+
+        Raises:
+            RuntimeError: 调用线程已存在运行中的事件循环（改用 arollback）
+            ValueError: 无快照或 checkpoint_id 不存在
+        """
+        return self._run_checkpoint_coro(self._checkpoint.rollback(checkpoint_id))
+
+    async def acheckpoint(self) -> str:
+        """异步版 checkpoint()。"""
+        return await self._checkpoint.checkpoint()
+
+    async def arollback(self, checkpoint_id: str | None = None) -> str:
+        """异步版 rollback()。"""
+        return await self._checkpoint.rollback(checkpoint_id)
+
+    @staticmethod
+    def _run_checkpoint_coro(coro: Any) -> Any:
+        """在无运行中事件循环的前提下同步执行 checkpoint 协程。"""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(coro)
+        else:
+            raise RuntimeError(
+                "Weave.checkpoint()/rollback() cannot be called from within a "
+                "running event loop. Use 'await weave.acheckpoint()' / "
+                "'await weave.arollback()' instead."
+            )
 
     # ── 状态查询 ──────────────────────────────────────
 

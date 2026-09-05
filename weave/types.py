@@ -212,7 +212,9 @@ class MemoryConfig:
     """Memory 总配置。"""
     scopes: dict[str, MemoryScopeConfig] = field(default_factory=dict)
     default_backend: str = "sqlite"
-    default_path: str = "./data/memory.db"
+    # 默认数据路径。相对路径在 load_config 中解析为相对配置文件目录
+    # （而非 CWD），见 docs/issues/012 路径规范化。
+    default_path: str = "./.weave/memory.db"
 
 
 @dataclass(slots=True)
@@ -254,6 +256,22 @@ class LoggingConfig:
 
 
 @dataclass(slots=True)
+class CheckpointConfig:
+    """状态回滚（checkpoint/rollback）配置。
+
+    enabled: 是否启用自动打点。默认 False（零开销，向后兼容）。启用后 Loop
+        在每次 tool 调用后（或按 trigger 指定时机）自动打快照。
+    trigger: 自动打点时机。"after_each_tool"（默认）| "after_each_llm" | "manual"。
+        "manual" 表示仅宿主显式调用 weave.checkpoint() 时才打点。
+    keep: 每个 session 保留最近 N 个快照（超出自动淘汰最旧的）。
+        快照本身 append-only（fork 语义），淘汰仅是回收旧快照，不破坏回滚能力。
+    """
+    enabled: bool = False
+    trigger: str = "after_each_tool"
+    keep: int = 10
+
+
+@dataclass(slots=True)
 class WeaveConfig:
     """Weave 顶层配置。"""
     agent: AgentConfig = field(default_factory=AgentConfig)
@@ -264,3 +282,4 @@ class WeaveConfig:
     features: FeatureConfig = field(default_factory=FeatureConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    checkpoint: CheckpointConfig = field(default_factory=CheckpointConfig)

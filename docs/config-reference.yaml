@@ -74,3 +74,8 @@ server:
 logging:
   level: INFO
   # file: ./logs/weave.log        # 可选，不配置时输出到 stderr
+
+checkpoint:                       # 状态回滚（docs/issues/012）
+  enabled: false                  # 是否启用自动打点；默认关闭（零开销，向后兼容）
+  trigger: after_each_tool        # after_each_tool | after_each_llm | manual
+  keep: 10                        # 每 session 保留最近 N 个快照（fork 语义，淘汰最旧）

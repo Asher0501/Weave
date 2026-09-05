@@ -1123,7 +1123,8 @@ class TestE2EConfigLoading:
 
         # 验证 memory（无 memory 段 → 默认）
         assert config.memory.default_backend == "sqlite"
-        assert config.memory.default_path == "./data/memory.db"
+        # 路径规范化：默认路径相对配置文件目录解析为绝对路径，数据目录为 .weave/
+        assert config.memory.default_path.endswith(".weave/memory.db")
 
         # 验证 prompts
         assert config.prompts.system == "prompts/system.md"
@@ -16888,7 +16889,8 @@ class TestRound19DefaultSharedDBUnit:
         from weave.types import MemoryConfig
 
         # 统一 memory.db：代码默认（不写 memory 段时的兜底路径）
-        assert MemoryConfig().default_path == "./data/memory.db"
+        # 默认数据目录改为 .weave/（docs/issues/012 路径规范化，隐藏目录）
+        assert MemoryConfig().default_path == "./.weave/memory.db"
 
     @pytest.mark.asyncio
     async def test_manager_three_access_share_single_sqlite_backend(self, tmp_path):

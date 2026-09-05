@@ -25,6 +25,11 @@
 | `emit()` | `(event_type: str, data: dict \| None = None) -> None` | 发布事件 |
 | `memory` | `-> MemoryManager` | Memory 公共访问入口 |
 | `status()` | `() -> dict` | 返回 Agent 状态 |
+| `checkpoint()` | `() -> str` | 手动打状态快照，返回 checkpoint_id |
+| `checkpoints()` | `() -> list[dict]` | 列出当前 session 的所有快照 |
+| `rollback()` | `(checkpoint_id: str \| None = None) -> str` | 回滚到指定快照（默认最近一个） |
+| `acheckpoint()` | `async () -> str` | 异步版 checkpoint() |
+| `arollback()` | `(checkpoint_id: str \| None = None) -> str` | 异步版 rollback() |
 
 **`weave.run()` 返回值 `LoopResult`**：
 ```python
@@ -65,7 +70,7 @@ LoopResult = namedtuple("LoopResult", [
 | `LoopResult` | `output, elapsed_ms, iterations, memory_updated` | run() 返回值 |
 | `SearchResult` | `id, content, score, metadata` | knowledge 搜索结果 |
 | `WeaveEvent` | `type, data, timestamp` | 事件总线事件 |
-| `WeaveConfig` | `agent, llm, loop, memory, prompts, features, server, logging` | 顶层配置 |
+| `WeaveConfig` | `agent, llm, loop, memory, prompts, features, server, logging, checkpoint` | 顶层配置 |
 
 ### 1.4 公开函数
 

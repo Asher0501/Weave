@@ -16,6 +16,7 @@ import yaml
 
 from weave.types import (
     AgentConfig,
+    CheckpointConfig,
     FeatureConfig,
     LLMConfig,
     LoggingConfig,
@@ -73,7 +74,47 @@ def _access_ttl(access_cfg: Any) -> Any:
     return None
 
 
-def _parse_memory_scopes(raw: dict) -> dict[str, MemoryScopeConfig]:
+def _resolve_relative_path(path: str, base_dir: Path) -> str:
+    """把相对路径解析为相对 base_dir 的绝对路径；绝对路径原样返回。
+
+    路径规范化（docs/issues/012）：默认相对路径相对配置文件目录，而非 CWD。
+    特殊值 ``:memory:``（SQLite 内存数据库标识）不是文件路径，原样返回。
+    绝对路径用字符串前缀判断（`/`、`\\`、盘符 `C:`）而非 Path.is_absolute——
+    后者在 Windows 上无法识别 Unix 风格 `/abs`（会被当作盘根相对路径）。
+    相对路径 resolve 后用 as_posix() 统一 `/` 分隔符。
+    """
+    if path == ":memory:":
+        return path
+    if _is_absolute(path):
+        return path
+    return (base_dir / path).as_posix()
+
+
+def _is_absolute(path: str) -> bool:
+    """用字符串前缀判断是否为绝对路径（跨平台）。
+
+    Unix: 以 `/` 开头；Windows: 以 `\\` 开头或盘符 `C:`（`C:\\` / `C:/`）。
+    """
+    if path.startswith(("/", "\\")):
+        return True
+    return len(path) >= 3 and path[1] == ":" and path[2] in ("/", "\\")
+
+
+def _resolve_access_path(access_cfg: Any, base_dir: Path | None) -> Any:
+    """解析 access 配置块内的 path 字段（stream.path / state.path / knowledge.path）。
+
+    返回新的 dict（不修改原 dict），path 字段被解析为相对配置文件目录的
+    绝对路径；无 path 字段、非 dict、或 base_dir 为 None（单元测试直调
+    _parse_memory_scopes 时）则原样返回。
+    """
+    if base_dir is None or not isinstance(access_cfg, dict) or "path" not in access_cfg:
+        return access_cfg
+    resolved = dict(access_cfg)
+    resolved["path"] = _resolve_relative_path(str(access_cfg["path"]), base_dir)
+    return resolved
+
+
+def _parse_memory_scopes(raw: dict, config_dir: Path | None = None) -> dict[str, MemoryScopeConfig]:
     """解析 memory.scopes 配置块。
 
     TTL 按 access 类型分别解析（stream.ttl / state.ttl / knowledge.ttl），
@@ -84,6 +125,8 @@ def _parse_memory_scopes(raw: dict) -> dict[str, MemoryScopeConfig]:
     backend 解析 scope 级 backend（session.backend），access 级 backend
     （session.stream.backend）保留在 access dict 中由 MemoryManager 读取
     （review round-6 issue 2）。
+    access 的 path 字段经 _resolve_access_path 解析为相对配置文件目录的
+    绝对路径（docs/issues/012 路径规范化）。
     """
     scopes: dict[str, MemoryScopeConfig] = {}
     for scope_name, scope_data in raw.items():
@@ -91,9 +134,9 @@ def _parse_memory_scopes(raw: dict) -> dict[str, MemoryScopeConfig]:
             continue
         # 用 len(scopes) 替代 scopes.__len__()，语义更清晰
         priority = scope_data.get("priority", len(scopes))
-        stream_cfg = scope_data.get("stream")
-        state_cfg = scope_data.get("state")
-        knowledge_cfg = scope_data.get("knowledge")
+        stream_cfg = _resolve_access_path(scope_data.get("stream"), config_dir)
+        state_cfg = _resolve_access_path(scope_data.get("state"), config_dir)
+        knowledge_cfg = _resolve_access_path(scope_data.get("knowledge"), config_dir)
 
         scopes[scope_name] = MemoryScopeConfig(
             priority=priority,
@@ -184,6 +227,13 @@ def load_config(config_path: str | Path) -> WeaveConfig:
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
+    # 路径规范化的基准：配置文件所在目录。所有默认相对路径（memory 的
+    # default_path / scope 的 path）都相对此目录解析，而非 CWD——这样
+    # `pip install weave` 后从任意目录运行，数据落点都可预期
+    # （docs/issues/012 路径规范化）。
+    config_path = config_path.resolve()
+    config_dir = config_path.parent
+
     # 1. 加载 Claude Code env，注入 os.environ（不覆盖已设置的环境变量）
     load_claude_env()
 
@@ -222,6 +272,7 @@ def load_config(config_path: str | Path) -> WeaveConfig:
     features_raw = raw.get("features", {}) or {}
     server_raw = raw.get("server", {}) or {}
     logging_raw = raw.get("logging", {}) or {}
+    checkpoint_raw = raw.get("checkpoint", {}) or {}
 
     # stream_timeout 为可选"空闲超时"（秒）：未配置（None）表示不启用；
     # 非数值 / 非法配置降级为 None，避免 asyncio.wait_for 收到非法 timeout。
@@ -278,9 +329,12 @@ def load_config(config_path: str | Path) -> WeaveConfig:
             llm_call_timeout=float(loop_raw.get("llm_call_timeout", 120.0)),
         ),
         memory=MemoryConfig(
-            scopes=_parse_memory_scopes(memory_raw.get("scopes", {})),
+            scopes=_parse_memory_scopes(memory_raw.get("scopes", {}), config_dir),
             default_backend=str(memory_raw.get("default_backend", "sqlite")),
-            default_path=str(memory_raw.get("default_path", "./data/memory.db")),
+            # 默认数据路径解析为相对配置文件目录（docs/issues/012 路径规范化）
+            default_path=_resolve_relative_path(
+                str(memory_raw.get("default_path", "./.weave/memory.db")), config_dir
+            ),
         ),
         prompts=PromptConfig(
             system=prompts_raw.get("system", ""),
@@ -301,5 +355,10 @@ def load_config(config_path: str | Path) -> WeaveConfig:
         logging=LoggingConfig(
             level=str(logging_raw.get("level", "INFO")),
             file=logging_raw.get("file"),
+        ),
+        checkpoint=CheckpointConfig(
+            enabled=bool(checkpoint_raw.get("enabled", False)),
+            trigger=str(checkpoint_raw.get("trigger", "after_each_tool")),
+            keep=int(checkpoint_raw.get("keep", 10)),
         ),
     )

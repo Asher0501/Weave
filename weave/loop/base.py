@@ -358,3 +358,22 @@ def format_memory_context(ctx: dict[str, Any]) -> str:
         ))
 
     return "\n\n".join(parts)
+
+
+async def _maybe_checkpoint(agent: Any) -> None:
+    """根据 checkpoint 配置在关键点自动打快照（状态回滚，见 docs/issues/012）。
+
+    默认关闭（checkpoint.enabled=false，零开销）。启用后按 trigger 决定：
+    after_each_tool / after_each_llm 由 Loop 在对应时机调用；manual 则完全
+    由宿主显式 weave.checkpoint() 触发。
+    """
+    cfg = getattr(agent._config, "checkpoint", None)
+    if cfg is None or not getattr(cfg, "enabled", False):
+        return
+    trigger = getattr(cfg, "trigger", "after_each_tool")
+    if trigger in ("after_each_tool", "after_each_llm"):
+        # 仅当 agent 已持有 CheckpointManager 时打点（注入的 FakeLLM / 极简
+        # 测试构造的 agent 可能没有；防御性跳过，避免打断主流程）
+        mgr = getattr(agent, "_checkpoint", None)
+        if mgr is not None:
+            await mgr.checkpoint()

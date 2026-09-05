@@ -21,6 +21,7 @@ from weave.loop.base import (
     persist_user_message,
     _emit_event,
     _is_streaming,
+    _maybe_checkpoint,
 )
 from weave.types import LoopResult, Message, ToolCall, ToolResult as ToolResultType
 
@@ -251,6 +252,10 @@ class IterativeLoop(BaseLoop):
 
                 # 记录到 tool_writes（实际写入计数）
                 tool_writes[tc.name] = tool_writes.get(tc.name, 0) + 1
+
+                # 状态回滚：checkpoint.enabled 且 trigger=after_each_tool 时，
+                # 每次 tool 执行后自动打快照（见 docs/issues/012）
+                await _maybe_checkpoint(agent)
 
             if finished or final_output:
                 exhausted = False

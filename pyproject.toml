@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "weave"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Non-intrusive Agent SDK with pluggable Loop and Memory mechanisms"
 readme = "README.md"
 license = {text = "MIT"}
@@ -12,9 +12,30 @@ requires-python = ">=3.11"
 authors = [
     {name = "Weave Contributors"}
 ]
+keywords = ["agent", "llm", "ai", "sdk", "loop", "memory", "non-intrusive"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "pyyaml>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/weave-contributors/weave"
+Repository = "https://github.com/weave-contributors/weave"
+Documentation = "https://github.com/weave-contributors/weave#readme"
+
+[project.scripts]
+weave = "weave.cli:main"
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.39.0"]
@@ -30,9 +51,12 @@ all = [
     "websockets>=12.0",
 ]
 
+[tool.setuptools.dynamic]
+version = {attr = "weave.__version__"}
+
 [tool.setuptools.packages.find]
 where = ["."]
 exclude = ["tests*", "examples*"]
 
 [tool.setuptools.package-data]
-weave = ["prompts/defaults/*.md"]
+weave = ["prompts/defaults/*.md", "py.typed"]

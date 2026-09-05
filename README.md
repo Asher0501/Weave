@@ -40,6 +40,18 @@ pip install -e .            # 核心（仅依赖 PyYAML）
 pip install -e ".[all]"     # 含 anthropic / openai / chromadb / fastapi
 ```
 
+### 脚手架（最快起步）
+
+```bash
+weave init my_agent          # 生成最小可跑通的项目骨架
+cd my_agent
+python agent.py              # 直接跑
+```
+
+生成的文件是「标准等价文件」——与手写完全一致。高级功能（`memory.scopes` /
+`checkpoint` / `register_*` / 自定义 loop/llm）全部保留，随时在骨架上扩展，见
+[文档](#文档)。
+
 ### 5 行代码
 
 ```python

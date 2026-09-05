@@ -104,3 +104,18 @@ class SQLiteStreamMemory:
 
     async def trim(self, max_items: int, namespace: str) -> None:
         self._backend(namespace).stream_trim(max_items, namespace)
+
+    async def delete_after(self, watermark: float, namespace: str) -> int:
+        """删除 created_at > watermark 的 stream 条目（用于状态回滚）。
+
+        Args:
+            watermark: 时间水位线（快照时刻）
+            namespace: 目标 namespace
+
+        Returns:
+            删除的条数
+        """
+        backend = self._backend(namespace)
+        if not hasattr(backend, "stream_delete_after"):
+            return 0
+        return backend.stream_delete_after(watermark, namespace)

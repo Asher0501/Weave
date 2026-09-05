@@ -151,6 +151,27 @@ class SQLiteBackend:
             )
             self.conn.commit()
 
+    def stream_delete_after(self, watermark: float, namespace: str) -> int:
+        """删除 created_at > watermark 的 stream 条目（用于状态回滚）。
+
+        Args:
+            watermark: 时间水位线（快照时刻的 time.time()）。快照前条目的
+                created_at 均小于 watermark，快照后条目的 created_at 均大于
+                watermark，据此精确分隔"快照后新增"的条目。
+            namespace: 目标 namespace
+
+        Returns:
+            删除的条数
+        """
+        cursor = self.conn.execute(
+            """DELETE FROM memory_entries
+                WHERE namespace = ? AND access_type = 'stream'
+                  AND created_at > ?""",
+            (namespace, watermark),
+        )
+        self.conn.commit()
+        return cursor.rowcount
+
     # ── State ─────────────────────────────────────────
 
     def state_get(self, key: str, namespace: str) -> Any | None:
