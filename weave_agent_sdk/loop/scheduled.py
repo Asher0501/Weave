@@ -238,8 +238,8 @@ class ScheduledLoop(BaseLoop):
                 namespaces = agent._memory.get_namespaces("state")
                 if namespaces:
                     session_ns = namespaces[0]
-                    await agent._memory.state.set("last_run_at", time.time(), session_ns)
-                    await agent._memory.state.set("last_run_error", None, session_ns)
+                    agent._memory.state.set("last_run_at", time.time(), session_ns)
+                    agent._memory.state.set("last_run_error", None, session_ns)
                     state_writes[session_ns] = 2
             except FileNotFoundError:
                 # namespace 对应的后端文件不存在是正常情况（首次运行或配置变更）
@@ -284,7 +284,7 @@ class ScheduledLoop(BaseLoop):
                 namespaces = agent._memory.get_namespaces("state")
                 if namespaces:
                     session_ns = namespaces[0]
-                    await agent._memory.state.set(
+                    agent._memory.state.set(
                         "last_run_error",
                         f"{type(e).__name__}: {e}",
                         session_ns,

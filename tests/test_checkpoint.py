@@ -67,16 +67,16 @@ def test_state_checkpoint_rollback(tmp_path):
         cp = CheckpointManager(mem, CheckpointConfig(enabled=True))
         ns = mem.get_namespace("session", "state")
 
-        await mem.state.set("topic", "A", ns)
+        mem.state.set("topic", "A", ns)
         cp_id = await cp.checkpoint()
 
-        await mem.state.set("topic", "B", ns)
-        await mem.state.set("extra", "new", ns)
+        mem.state.set("topic", "B", ns)
+        mem.state.set("extra", "new", ns)
 
         await cp.rollback(cp_id)
 
-        assert await mem.state.get("topic", ns) == "A"   # 恢复旧值
-        assert await mem.state.get("extra", ns) is None  # 删除新增 key
+        assert mem.state.get("topic", ns) == "A"   # 恢复旧值
+        assert mem.state.get("extra", ns) is None  # 删除新增 key
 
     _run(scenario())
 
@@ -87,14 +87,14 @@ def test_stream_checkpoint_rollback(tmp_path):
         cp = CheckpointManager(mem, CheckpointConfig(enabled=True))
         sns = mem.get_namespace("session", "stream")
 
-        await mem.stream.append({"role": "user", "content": "msg1"}, sns)
+        mem.stream.append({"role": "user", "content": "msg1"}, sns)
         cp_id = await cp.checkpoint()
 
-        await mem.stream.append({"role": "user", "content": "msg2"}, sns)
+        mem.stream.append({"role": "user", "content": "msg2"}, sns)
 
         await cp.rollback(cp_id)
 
-        msgs = await mem.stream.last(10, [sns])
+        msgs = mem.stream.last(10, [sns])
         contents = [m.get("content") for m in msgs]
         assert contents == ["msg1"]  # 删除快照后新增的 msg2
 
@@ -109,9 +109,9 @@ def test_fork_semantics_preserves_checkpoints(tmp_path):
         cp = CheckpointManager(mem, CheckpointConfig(enabled=True, keep=10))
         ns = mem.get_namespace("session", "state")
 
-        await mem.state.set("topic", "A", ns)
+        mem.state.set("topic", "A", ns)
         cp1 = await cp.checkpoint()
-        await mem.state.set("topic", "B", ns)
+        mem.state.set("topic", "B", ns)
         cp2 = await cp.checkpoint()
 
         await cp.rollback(cp1)  # 回滚到第一个
@@ -141,7 +141,7 @@ def test_rollback_unknown_id_raises(tmp_path):
         mem = _make_manager(tmp_path)
         cp = CheckpointManager(mem, CheckpointConfig(enabled=True))
         ns = mem.get_namespace("session", "state")
-        await mem.state.set("topic", "A", ns)
+        mem.state.set("topic", "A", ns)
         await cp.checkpoint()
         with pytest.raises(ValueError, match="not found"):
             await cp.rollback("cp_nonexistent")
@@ -155,14 +155,14 @@ def test_rollback_default_targets_latest(tmp_path):
         cp = CheckpointManager(mem, CheckpointConfig(enabled=True))
         ns = mem.get_namespace("session", "state")
 
-        await mem.state.set("topic", "A", ns)
+        mem.state.set("topic", "A", ns)
         await cp.checkpoint()
-        await mem.state.set("topic", "B", ns)
+        mem.state.set("topic", "B", ns)
         await cp.checkpoint()
 
         await cp.rollback(None)  # 回滚到最近一个 = B
 
-        assert await mem.state.get("topic", ns) == "B"
+        assert mem.state.get("topic", ns) == "B"
 
     _run(scenario())
 
@@ -176,7 +176,7 @@ def test_keep_enforcement_evicts_oldest(tmp_path):
         ns = mem.get_namespace("session", "state")
 
         for i in range(3):
-            await mem.state.set("topic", f"v{i}", ns)
+            mem.state.set("topic", f"v{i}", ns)
             await cp.checkpoint()
 
         cps = await cp.checkpoints()

@@ -1795,7 +1795,7 @@ class TestChatStreamToolsSupport:
 
 
 class TestStreamLastMultiBackend:
-    """测试 SQLiteStreamMemory.last() 多 backend 合并排序。
+    """测试 MemoryStream.last() 多 backend 合并排序。
 
     覆盖修复项3（第5轮）：多个 backend 时合并排序，而非只处理第一个。
     """
@@ -1837,35 +1837,35 @@ class TestStreamLastMultiBackend:
     def test_last_merges_all_backends_when_namespaces_none(self):
         """验证 last(namespaces=None) 遍历所有 backend 收集结果并合并。"""
         import inspect
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
-        source = inspect.getsource(SQLiteStreamMemory.last)
+        source = inspect.getsource(MemoryStream.last)
         # 应遍历所有 backend
         assert "for backend in self._manager._backends.values()" in source
 
     def test_last_cleans_created_at_internal_field(self):
         """验证 last() 在返回前清理了 _created_at 内部字段。"""
         import inspect
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
-        source = inspect.getsource(SQLiteStreamMemory.last)
+        source = inspect.getsource(MemoryStream.last)
         assert 'pop("_created_at"' in source
 
     def test_last_handles_empty_results(self):
         """验证 last() 在所有 backend 无结果时返回空列表。"""
         import inspect
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
-        source = inspect.getsource(SQLiteStreamMemory.last)
+        source = inspect.getsource(MemoryStream.last)
         # 应该有空结果检查
         assert "if not all_results" in source
 
     def test_last_with_specific_namespaces_single_backend_optimization(self):
         """验证 last() 在指定 namespaces 且仅一个 backend 时走快速路径。"""
         import inspect
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
-        source = inspect.getsource(SQLiteStreamMemory.last)
+        source = inspect.getsource(MemoryStream.last)
         # 应有单 backend 优化路径
         assert "len(backend_to_ns) == 1" in source
 
@@ -1933,7 +1933,7 @@ class TestCreateLoopScheduledE2E:
 
 
 class TestStreamLastMultiBackendE2E:
-    """端到端测试：SQLiteStreamMemory.last() 多 backend 合并排序行为。
+    """端到端测试：MemoryStream.last() 多 backend 合并排序行为。
 
     使用真实的 SQLiteBackend 实例验证跨 backend 数据合并的正确性。
     """
@@ -1985,7 +1985,7 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_merges_two_backends(self, multi_backend_setup):
         """验证 last() 在多个 backend 时正确合并所有结果。"""
         backend1, backend2 = multi_backend_setup
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
         # 创建 mock manager，包含两个 backend
         manager = MagicMock()
@@ -1994,11 +1994,11 @@ class TestStreamLastMultiBackendE2E:
             "backend2": backend2,
         }
 
-        stream_memory = SQLiteStreamMemory(manager)
+        stream_memory = MemoryStream(manager)
 
         # 执行 last()，namespaces=None 应收集所有 backend 数据
         import asyncio
-        results = asyncio.run(stream_memory.last(n=10, namespaces=None))
+        results = stream_memory.last(n=10, namespaces=None)
 
         # 应返回 6 条结果（两个 backend 各 3 条）
         assert len(results) == 6, f"Expected 6 results, got {len(results)}"
@@ -2022,7 +2022,7 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_limits_results_correctly(self, multi_backend_setup):
         """验证 last(n) 正确限制返回条数。"""
         backend1, backend2 = multi_backend_setup
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
         manager = MagicMock()
         manager._backends = {
@@ -2030,11 +2030,11 @@ class TestStreamLastMultiBackendE2E:
             "backend2": backend2,
         }
 
-        stream_memory = SQLiteStreamMemory(manager)
+        stream_memory = MemoryStream(manager)
 
         import asyncio
         # 只取 3 条
-        results = asyncio.run(stream_memory.last(n=3, namespaces=None))
+        results = stream_memory.last(n=3, namespaces=None)
 
         # 应只返回 3 条（最新的 3 条，即 msg_b_2, msg_b_1, msg_b_0）
         assert len(results) == 3, f"Expected 3 results, got {len(results)}"
@@ -2048,7 +2048,7 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_with_specific_namespace(self, multi_backend_setup):
         """验证 last(namespaces=[...]) 只返回指定 namespace 的数据。"""
         backend1, backend2 = multi_backend_setup
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
         # 需要 mock _backend 方法
         manager = MagicMock()
@@ -2063,13 +2063,13 @@ class TestStreamLastMultiBackendE2E:
             return backend2
         manager._get_backend_for_namespace = mock_get_backend
 
-        stream_memory = SQLiteStreamMemory(manager)
+        stream_memory = MemoryStream(manager)
 
         import asyncio
         # 只查 scope1 的数据
-        results = asyncio.run(stream_memory.last(
+        results = stream_memory.last(
             n=10, namespaces=["scope1:session:stream"]
-        ))
+        )
 
         # 应只返回 3 条（scope1 的数据）
         assert len(results) == 3, f"Expected 3 results, got {len(results)}"
@@ -2082,23 +2082,23 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_empty_backend_returns_empty(self):
         """验证 last() 在所有 backend 为空时返回空列表。"""
         from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
         backend = SQLiteBackend(":memory:")
         manager = MagicMock()
         manager._backends = {"mem": backend}
 
-        stream_memory = SQLiteStreamMemory(manager)
+        stream_memory = MemoryStream(manager)
 
         import asyncio
-        results = asyncio.run(stream_memory.last(n=10, namespaces=None))
+        results = stream_memory.last(n=10, namespaces=None)
 
         assert results == [], f"Expected empty list, got {results}"
 
     def test_stream_last_merges_three_backends(self, three_backend_setup):
         """验证 last() 在三个 backend 时正确合并所有结果（多于2个的场景）。"""
         backend0, backend1, backend2 = three_backend_setup
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
         manager = MagicMock()
         manager._backends = {
@@ -2107,10 +2107,10 @@ class TestStreamLastMultiBackendE2E:
             "backend2": backend2,
         }
 
-        stream_memory = SQLiteStreamMemory(manager)
+        stream_memory = MemoryStream(manager)
 
         import asyncio
-        results = asyncio.run(stream_memory.last(n=10, namespaces=None))
+        results = stream_memory.last(n=10, namespaces=None)
 
         # 应返回 6 条结果（三个 backend 各 2 条）
         assert len(results) == 6, f"Expected 6 results, got {len(results)}"
@@ -2128,7 +2128,7 @@ class TestStreamLastMultiBackendE2E:
     def test_stream_last_with_duplicate_namespaces_in_list(self, multi_backend_setup):
         """验证 last() 在 namespaces 列表包含重复项时不会导致重复结果。"""
         backend1, backend2 = multi_backend_setup
-        from weave_agent_sdk.memory.stream import SQLiteStreamMemory
+        from weave_agent_sdk.memory.stream import MemoryStream
 
         manager = MagicMock()
         manager._backends = {
@@ -2142,13 +2142,13 @@ class TestStreamLastMultiBackendE2E:
             return backend2
         manager._get_backend_for_namespace = mock_get_backend
 
-        stream_memory = SQLiteStreamMemory(manager)
+        stream_memory = MemoryStream(manager)
 
         import asyncio
         # 传入包含重复 namespace 的列表
-        results = asyncio.run(stream_memory.last(
+        results = stream_memory.last(
             n=10, namespaces=["scope1:session:stream", "scope1:session:stream", "scope1:session:stream"]
-        ))
+        )
 
         # 应只返回 3 条（去重后 scope1 的数据）
         assert len(results) == 3, f"Expected 3 results (deduplicated), got {len(results)}"
@@ -3772,7 +3772,7 @@ class TestScheduledStateWriteAdditional:
         agent._system_prompt = "System prompt"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=["session:abc:state"])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -3807,7 +3807,7 @@ class TestScheduledStateWriteAdditional:
         agent._system_prompt = "System prompt"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=[])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -4103,7 +4103,7 @@ class TestScheduledStateWritePartialFailure:
         agent._system_prompt = "System prompt"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=["s:1:state"])
-        agent._memory.state.set = AsyncMock(side_effect=[None, RuntimeError("second fail")])
+        agent._memory.state.set = MagicMock(side_effect=[None, RuntimeError("second fail")])
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -4508,7 +4508,7 @@ class TestRound3ScheduledWriteUnit:
         agent._system_prompt = "System prompt"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=["s:1:state"])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -4671,7 +4671,7 @@ class TestRound3ScheduledRunE2E:
         agent._system_prompt = "System prompt"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=["s:1:state"])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -4705,7 +4705,7 @@ class TestRound3ScheduledRunE2E:
         agent._system_prompt = "System prompt"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=["s:1:state"])
-        agent._memory.state.set = AsyncMock(side_effect=FileNotFoundError("db missing"))
+        agent._memory.state.set = MagicMock(side_effect=FileNotFoundError("db missing"))
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -4903,7 +4903,7 @@ class TestRound4ScheduledWriteUnit:
         agent._system_prompt = "System prompt"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=["s:1:state"])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -4931,7 +4931,7 @@ class TestRound4ScheduledWriteUnit:
         agent._system_prompt = "System prompt"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=["s:1:state", "s:2:state"])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -5079,7 +5079,7 @@ class TestRound4ScheduledRunE2E:
         agent._system_prompt = "System prompt"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=["s:1:state"])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -5136,11 +5136,11 @@ class TestRound4MemoryManagerE2E:
         ns = manager.get_namespace("default", "state")
         assert ns == "default:s1:state"
 
-        await manager.state.set("last_run_at", 1234.5, ns)
-        await manager.state.set("last_run_error", None, ns)
+        manager.state.set("last_run_at", 1234.5, ns)
+        manager.state.set("last_run_error", None, ns)
 
-        assert await manager.state.get("last_run_at", ns) == 1234.5
-        assert await manager.state.get("last_run_error", ns) is None
+        assert manager.state.get("last_run_at", ns) == 1234.5
+        assert manager.state.get("last_run_error", ns) is None
 
 
 class TestRound4CreateLLMDeepseekE2E:
@@ -5574,8 +5574,8 @@ class TestRound6MemoryWritesResetUnit:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": ["s:1:stream"], "state": ["s:1:state"], "knowledge": [],
         }[at])
-        agent._memory.stream.append = AsyncMock()
-        agent._memory.state.set = AsyncMock()
+        agent._memory.stream.append = MagicMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -5610,7 +5610,7 @@ class TestRound6MemoryWritesResetUnit:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": [], "state": ["s:1:state"], "knowledge": [],
         }[at])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
         # 模拟上次触发遗留的写入计数
         agent.__dict__["_memory_writes"] = {"stream": {"s:old:stream": 99}}
 
@@ -5807,8 +5807,8 @@ class TestRound6MemoryWritesResetE2E:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": ["s:1:stream"], "state": ["s:1:state"], "knowledge": [],
         }[at])
-        agent._memory.stream.append = AsyncMock()
-        agent._memory.state.set = AsyncMock()
+        agent._memory.stream.append = MagicMock()
+        agent._memory.state.set = MagicMock()
         agent._event_bus = EventBus()
 
         results = []
@@ -6102,7 +6102,7 @@ class TestRound7MemoryContextLimitUnit:
         agent = _Round7BeforeThinkAgent(limit="not-an-int")
         captured = {}
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             captured["n"] = n
             return [{"role": "user", "content": f"m{i}"} for i in range(min(n, 50))]
 
@@ -6155,7 +6155,10 @@ class TestRound7ReentryE2E:
         weave._memory = MagicMock()
         weave._memory.activate_scopes = MagicMock()
         weave._memory.get_namespaces = MagicMock(return_value=["default:default:state"])
-        weave._memory.state.set = AsyncMock()
+        weave._memory.state.set = MagicMock()
+        weave._memory.stream.last = MagicMock(return_value=[])
+        weave._memory.state.get_all = MagicMock(return_value={})
+        weave._memory.knowledge.search = MagicMock(return_value=[])
         weave._prompts = MagicMock()
         weave._prompts.get = MagicMock(return_value="System prompt")
         weave._loop = ScheduledLoop()
@@ -6339,7 +6342,7 @@ class TestRound7MemoryContextLimitE2E:
         agent = _Round7BeforeThinkAgent(limit=3)
         captured = {}
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             captured["n"] = n
             return [{"role": "user", "content": f"msg{i}"} for i in range(min(n, 50))]
 
@@ -6353,7 +6356,7 @@ class TestRound7MemoryContextLimitE2E:
         agent2 = _Round7BeforeThinkAgent(limit=10)
         captured2 = {}
 
-        async def fake_last2(n, namespaces):
+        def fake_last2(n, namespaces):
             captured2["n"] = n
             return [{"role": "user", "content": f"msg{i}"} for i in range(min(n, 50))]
 
@@ -6596,7 +6599,7 @@ class TestRound9ScheduledLastRunUnit:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": [], "state": ["s:1:state"], "knowledge": [],
         }[at])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -6777,7 +6780,7 @@ class TestRound9ScheduledLastRunE2E:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": [], "state": ["s:1:state"], "knowledge": [],
         }[at])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
         agent._event_bus = EventBus()
         agent._last_run = None
         agent._run_locks = {}
@@ -7043,9 +7046,9 @@ class TestRound10ScheduledLastRunUnit:
             "stream": [], "state": ["s:1:state"], "knowledge": [],
         }[at])
         if state_error is not None:
-            agent._memory.state.set = AsyncMock(side_effect=state_error)
+            agent._memory.state.set = MagicMock(side_effect=state_error)
         else:
-            agent._memory.state.set = AsyncMock()
+            agent._memory.state.set = MagicMock()
         agent._last_run = None
         return agent
 
@@ -7339,7 +7342,7 @@ class TestRound10ScheduledLastRunE2E:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": [], "state": ["s:1:state"], "knowledge": [],
         }[at])
-        agent._memory.state.set = AsyncMock(side_effect=RuntimeError("storage down"))
+        agent._memory.state.set = MagicMock(side_effect=RuntimeError("storage down"))
         agent._event_bus = EventBus()
         agent._last_run = None
         agent._run_locks = {}
@@ -9769,7 +9772,7 @@ class TestRound16DelayedUserE2E:
         agent_ok._llm.chat = AsyncMock(return_value=LLMResponse(content="reply", model="test"))
         agent_ok._memory = MagicMock()
         agent_ok._memory.get_namespaces = MagicMock(return_value=["s:1:stream"])
-        agent_ok._memory.stream.append = AsyncMock()
+        agent_ok._memory.stream.append = MagicMock()
         agent_ok.__dict__["_memory_writes"] = {}
 
         loop_ok = SimpleLoop()
@@ -9795,7 +9798,7 @@ class TestRound16DelayedUserE2E:
         agent_fail._llm.chat = AsyncMock(side_effect=RuntimeError("llm down"))
         agent_fail._memory = MagicMock()
         agent_fail._memory.get_namespaces = MagicMock(return_value=["s:1:stream"])
-        agent_fail._memory.stream.append = AsyncMock()
+        agent_fail._memory.stream.append = MagicMock()
         agent_fail.__dict__["_memory_writes"] = {}
 
         loop_fail = SimpleLoop()
@@ -10019,7 +10022,7 @@ class TestRound1BeforeThinkPerNsUnit:
 
         called = {}
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             called[namespaces[0]] = n
             return [{"role": "user", "content": f"{namespaces[0]}:{i}"} for i in range(n)]
 
@@ -10055,7 +10058,7 @@ class TestRound1BeforeThinkPerNsUnit:
                     [{"role": "user", "content": f"a_r{i}"} for i in range(2)]
         entries_b = [{"role": "user", "content": f"b_h{i}"} for i in range(5)]
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             ns = namespaces[0]
             return (entries_a if ns == "ns_a:session:stream" else entries_b)[-n:]
 
@@ -10249,7 +10252,7 @@ class TestRound1BeforeThinkPerNsE2E:
 
         # ns_a 后端：5 条历史 + 1 条本次写入（窗口 3+1=4 → 剔 1 → 3 条历史）
         # ns_b 后端：5 条历史 + 2 条本次写入（窗口 3+2=5 → 剔 2 → 3 条历史）
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             ns = namespaces[0]
             if ns == "ns_a:session:stream":
                 hist = [{"role": "user", "content": f"a_h{i}"} for i in range(5)]
@@ -10535,7 +10538,7 @@ class TestRound2BeforeThinkUnit:
 
         called = {}
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             called[namespaces[0]] = n
             return [{"role": "user", "content": f"h{i}"} for i in range(n)]
 
@@ -10567,7 +10570,7 @@ class TestRound2BeforeThinkUnit:
             "stream": ["ns:session:stream"], "state": [], "knowledge": [],
         }[at])
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             # 后端只有 3 条，且全部属于"本次运行"
             return [{"role": "user", "content": f"run{i}"} for i in range(3)]
 
@@ -10786,7 +10789,7 @@ class TestRound2BeforeThinkE2E:
             "ns_c:session:stream": 0,
         }
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             ns = namespaces[0]
             hist = [{"role": "user", "content": f"{ns}:h{i}"} for i in range(10)]
             runs = [{"role": "user", "content": f"{ns}:r{i}"} for i in range(run_counts[ns])]
@@ -11035,7 +11038,7 @@ class TestRound3BeforeThinkPerNsUnit:
 
         called = {}
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             called[namespaces[0]] = n
             return [{"role": "user", "content": f"{namespaces[0]}:{i}"} for i in range(n)]
 
@@ -11064,14 +11067,14 @@ class TestRound3BeforeThinkPerNsUnit:
             "knowledge": ["ns:session:knowledge"],
         }[at])
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             all_entries = [{"role": "user", "content": f"h{i}"} for i in range(5)] + \
                           [{"role": "user", "content": f"run{i}"} for i in range(2)]
             return all_entries[-n:]
 
         agent._memory.stream.last = fake_last
-        agent._memory.state.get_all = AsyncMock(return_value={"k": "v"})
-        agent._memory.knowledge.search = AsyncMock(return_value=[SimpleNamespace(content="kb")])
+        agent._memory.state.get_all = MagicMock(return_value={"k": "v"})
+        agent._memory.knowledge.search = MagicMock(return_value=[SimpleNamespace(content="kb")])
 
         loop = _Round1ConcreteLoop()
         ctx = await loop.before_think(agent, "hi")
@@ -11149,7 +11152,7 @@ class TestRound3ScheduledRestartUnit:
         agent._system_prompt = "System"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=["s:1:state"])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -11308,7 +11311,7 @@ class TestRound3BeforeThinkPerNsE2E:
             "stream": ["ns:session:stream"], "state": [], "knowledge": [],
         }[at])
 
-        async def fake_last(n, namespaces):
+        def fake_last(n, namespaces):
             all_entries = [{"role": "user", "content": f"h{i}"} for i in range(5)] + \
                           [{"role": "user", "content": f"run{i}"} for i in range(2)]
             return all_entries[-n:]
@@ -11395,7 +11398,10 @@ class TestRound3ScheduledRestartE2E:
         weave._memory = MagicMock()
         weave._memory.activate_scopes = MagicMock()
         weave._memory.get_namespaces = MagicMock(return_value=["default:default:state"])
-        weave._memory.state.set = AsyncMock()
+        weave._memory.state.set = MagicMock()
+        weave._memory.stream.last = MagicMock(return_value=[])
+        weave._memory.state.get_all = MagicMock(return_value={})
+        weave._memory.knowledge.search = MagicMock(return_value=[])
         weave._memory.stats = MagicMock(return_value={})
         weave._prompts = MagicMock()
         weave._prompts.get = MagicMock(return_value="System prompt")
@@ -12117,7 +12123,7 @@ class TestRound6TTLUnit:
         ns = "session:abc:stream"
 
         # stream 写入：expires_at 已设置（created_at + ttl）
-        await manager.stream.append({"role": "user", "content": "first"}, ns)
+        manager.stream.append({"role": "user", "content": "first"}, ns)
         backend = manager._get_backend_for_namespace(ns)
         cursor = backend.conn.execute(
             "SELECT created_at, expires_at FROM memory_entries WHERE namespace = ?",
@@ -12129,14 +12135,14 @@ class TestRound6TTLUnit:
 
         # 等待过期后，下一次写入触发写路径清理：仅剩未过期的 second
         await asyncio.sleep(0.1)
-        await manager.stream.append({"role": "user", "content": "second"}, ns)
-        last = await manager.stream.last(10, [ns])
+        manager.stream.append({"role": "user", "content": "second"}, ns)
+        last = manager.stream.last(10, [ns])
         assert len(last) == 1, "过期条目应被写路径被动清理"
         assert last[0]["content"] == "second"
 
         # state / knowledge 写入同样按 ttl 设置 expires_at
         state_ns = "session:abc:state"
-        await manager.state.set("k", "v", state_ns)
+        manager.state.set("k", "v", state_ns)
         cursor = backend.conn.execute(
             "SELECT expires_at FROM memory_entries WHERE namespace = ? AND access_type = 'state'",
             (state_ns,),
@@ -12144,7 +12150,7 @@ class TestRound6TTLUnit:
         assert cursor.fetchone()[0] is not None, "state 写入应按 ttl 设置 expires_at"
 
         knowledge_ns = "session:abc:knowledge"
-        await manager.knowledge.add("hello world", knowledge_ns)
+        manager.knowledge.add("hello world", knowledge_ns)
         cursor = backend.conn.execute(
             "SELECT expires_at FROM memory_entries WHERE namespace = ? AND access_type = 'knowledge'",
             (knowledge_ns,),
@@ -12184,11 +12190,11 @@ class TestRound6StateNarrowOverWideUnit:
         narrow_ns = manager.get_namespace("narrow", "state")
         wide_ns = manager.get_namespace("wide", "state")
 
-        await manager.state.set("theme", "narrow-theme", narrow_ns)
-        await manager.state.set("theme", "wide-theme", wide_ns)
+        manager.state.set("theme", "narrow-theme", narrow_ns)
+        manager.state.set("theme", "wide-theme", wide_ns)
 
         # 窄→宽顺序传入：窄 scope 覆盖宽 scope，返回窄值
-        result = await manager.state.get_all([narrow_ns, wide_ns])
+        result = manager.state.get_all([narrow_ns, wide_ns])
         assert result["theme"] == "narrow-theme", \
             "同 key 时窄 scope 应覆盖宽 scope（get_all 按宽→窄合并）"
 
@@ -12303,7 +12309,7 @@ class TestRound6ScheduledNoPhantomNsUnit:
         agent._memory = MagicMock()
         # 所有 access_type 均无激活 namespace
         agent._memory.get_namespaces = MagicMock(return_value=[])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -12358,7 +12364,7 @@ class TestRound6TTLE2E:
 
         manager = MemoryManager(config.memory)
         ns = "session:abc:stream"
-        await manager.stream.append({"role": "user", "content": "first"}, ns)
+        manager.stream.append({"role": "user", "content": "first"}, ns)
         backend = manager._get_backend_for_namespace(ns)
         cursor = backend.conn.execute(
             "SELECT expires_at FROM memory_entries WHERE namespace = ?", (ns,)
@@ -12367,14 +12373,14 @@ class TestRound6TTLE2E:
 
         await asyncio.sleep(0.1)
         # 过期后：last() 排除过期条目
-        assert await manager.stream.last(10, [ns]) == []
+        assert manager.stream.last(10, [ns]) == []
         # 写路径清理：再次写入触发 cleanup，过期条目被删除
-        await manager.stream.append({"role": "user", "content": "second"}, ns)
+        manager.stream.append({"role": "user", "content": "second"}, ns)
         cursor = backend.conn.execute(
             "SELECT COUNT(*) FROM memory_entries WHERE namespace = ?", (ns,)
         )
         assert cursor.fetchone()[0] == 1, "过期条目应被写路径被动清理"
-        last = await manager.stream.last(10, [ns])
+        last = manager.stream.last(10, [ns])
         assert len(last) == 1 and last[0]["content"] == "second"
 
 
@@ -12419,11 +12425,11 @@ class TestRound6StateNarrowOverWideE2E:
 
         narrow_ns = manager.get_namespace("narrow", "state")
         wide_ns = manager.get_namespace("wide", "state")
-        await manager.state.set("theme", "narrow-theme", narrow_ns)
-        await manager.state.set("theme", "wide-theme", wide_ns)
+        manager.state.set("theme", "narrow-theme", narrow_ns)
+        manager.state.set("theme", "wide-theme", wide_ns)
 
         # 同 key 时窄 scope 覆盖宽 scope
-        result = await manager.state.get_all([narrow_ns, wide_ns])
+        result = manager.state.get_all([narrow_ns, wide_ns])
         assert result["theme"] == "narrow-theme"
 
 
@@ -12865,7 +12871,7 @@ class TestRound7CleanupExpiredFixE2E:
         }, default_path=":memory:"))
         ns = "session:abc:stream"
 
-        await manager.stream.append({"role": "user", "content": "first"}, ns)
+        manager.stream.append({"role": "user", "content": "first"}, ns)
         backend = manager._get_backend_for_namespace(ns)
         cursor = backend.conn.execute(
             "SELECT expires_at FROM memory_entries WHERE namespace = ?", (ns,)
@@ -12873,8 +12879,8 @@ class TestRound7CleanupExpiredFixE2E:
         assert cursor.fetchone()[0] is not None, "写入应按 ttl 设置 expires_at"
 
         await asyncio.sleep(0.1)
-        await manager.stream.append({"role": "user", "content": "second"}, ns)
-        last = await manager.stream.last(10, [ns])
+        manager.stream.append({"role": "user", "content": "second"}, ns)
+        last = manager.stream.last(10, [ns])
         assert [e["content"] for e in last] == ["second"], \
             "过期条目应被写路径被动清理，仅保留新条目"
         assert backend.namespace_stats().get(ns) == 1
@@ -13546,7 +13552,7 @@ class TestRound11TTLRecheckUnit:
         }, default_path=":memory:"))
         ns = "session:abc:stream"
 
-        await manager.stream.append({"role": "user", "content": "first"}, ns)
+        manager.stream.append({"role": "user", "content": "first"}, ns)
         backend = manager._get_backend_for_namespace(ns)
         cursor = backend.conn.execute(
             "SELECT expires_at FROM memory_entries WHERE namespace = ?", (ns,)
@@ -13555,7 +13561,7 @@ class TestRound11TTLRecheckUnit:
 
         await asyncio.sleep(0.1)
         # 过期条目从读取路径排除
-        assert await manager.stream.last(10, [ns]) == []
+        assert manager.stream.last(10, [ns]) == []
         # 显式清理回收过期条目
         assert manager.cleanup() >= 1
         remaining = backend.conn.execute(
@@ -13583,11 +13589,11 @@ class TestRound11StateNarrowWideRecheckUnit:
         nss = manager.get_namespaces("state")
         assert nss == ["narrow:n1:state", "mid:m1:state", "wide:w1:state"]
 
-        await manager.state.set("theme", "narrow", nss[0])
-        await manager.state.set("theme", "mid", nss[1])
-        await manager.state.set("theme", "wide", nss[2])
+        manager.state.set("theme", "narrow", nss[0])
+        manager.state.set("theme", "mid", nss[1])
+        manager.state.set("theme", "wide", nss[2])
 
-        result = await manager.state.get_all(nss)
+        result = manager.state.get_all(nss)
         assert result["theme"] == "narrow", "最窄 scope 应覆盖同 key"
 
     @pytest.mark.asyncio
@@ -13605,10 +13611,10 @@ class TestRound11StateNarrowWideRecheckUnit:
         narrow_ns = manager.get_namespace("narrow", "state")
         wide_ns = manager.get_namespace("wide", "state")
 
-        await manager.state.set("only_narrow", "nv", narrow_ns)
-        await manager.state.set("only_wide", "wv", wide_ns)
+        manager.state.set("only_narrow", "nv", narrow_ns)
+        manager.state.set("only_wide", "wv", wide_ns)
 
-        result = await manager.state.get_all([narrow_ns, wide_ns])
+        result = manager.state.get_all([narrow_ns, wide_ns])
         assert result["only_narrow"] == "nv"
         assert result["only_wide"] == "wv"
 
@@ -13721,7 +13727,7 @@ class TestRound11ScheduledNoPhantomRecheckUnit:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": ["s:1:stream"], "state": ["s:1:state"], "knowledge": [],
         }[at])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -13755,7 +13761,7 @@ class TestRound11ScheduledNoPhantomRecheckUnit:
         agent._memory = MagicMock()
         # 漂移根因：get_namespaces 对任意 access_type 均返回 []
         agent._memory.get_namespaces = MagicMock(return_value=[])
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -13802,7 +13808,7 @@ class TestRound11TTLRecheckE2E:
 
         manager = MemoryManager(config.memory)
         ns = "session:abc:stream"
-        await manager.stream.append({"role": "user", "content": "first"}, ns)
+        manager.stream.append({"role": "user", "content": "first"}, ns)
         backend = manager._get_backend_for_namespace(ns)
         cursor = backend.conn.execute(
             "SELECT expires_at FROM memory_entries WHERE namespace = ?", (ns,)
@@ -13810,7 +13816,7 @@ class TestRound11TTLRecheckE2E:
         assert cursor.fetchone()[0] is not None
 
         await asyncio.sleep(0.1)
-        assert await manager.stream.last(10, [ns]) == []
+        assert manager.stream.last(10, [ns]) == []
         assert manager.cleanup() >= 1
         assert backend.conn.execute(
             "SELECT COUNT(*) FROM memory_entries WHERE namespace = ?", (ns,)
@@ -13857,11 +13863,11 @@ class TestRound11StateNarrowWideRecheckE2E:
         nss = manager.get_namespaces("state")
         assert nss == ["narrow:n1:state", "mid:m1:state", "wide:w1:state"]
 
-        await manager.state.set("theme", "narrow", nss[0])
-        await manager.state.set("theme", "mid", nss[1])
-        await manager.state.set("theme", "wide", nss[2])
+        manager.state.set("theme", "narrow", nss[0])
+        manager.state.set("theme", "mid", nss[1])
+        manager.state.set("theme", "wide", nss[2])
 
-        result = await manager.state.get_all(nss)
+        result = manager.state.get_all(nss)
         assert result["theme"] == "narrow"
 
 
@@ -14117,7 +14123,7 @@ class TestRound12TTLE2E:
 
         manager = MemoryManager(config.memory)
         ns = "session:abc:stream"
-        await manager.stream.append({"role": "user", "content": "first"}, ns)
+        manager.stream.append({"role": "user", "content": "first"}, ns)
         backend = manager._get_backend_for_namespace(ns)
         cursor = backend.conn.execute(
             "SELECT expires_at FROM memory_entries WHERE namespace = ?", (ns,)
@@ -14126,10 +14132,10 @@ class TestRound12TTLE2E:
 
         await asyncio.sleep(0.1)
         # 读取路径排除过期条目
-        assert await manager.stream.last(10, [ns]) == []
+        assert manager.stream.last(10, [ns]) == []
         # 写路径被动清理：再次写入后仅保留新条目
-        await manager.stream.append({"role": "user", "content": "second"}, ns)
-        last = await manager.stream.last(10, [ns])
+        manager.stream.append({"role": "user", "content": "second"}, ns)
+        last = manager.stream.last(10, [ns])
         assert [e["content"] for e in last] == ["second"]
         assert backend.namespace_stats().get(ns) == 1
 
@@ -14151,11 +14157,11 @@ class TestRound12StateNarrowWideUnit:
         narrow_ns = manager.get_namespace("narrow", "state")
         wide_ns = manager.get_namespace("wide", "state")
 
-        await manager.state.set("shared", "narrow", narrow_ns)
-        await manager.state.set("shared", "wide", wide_ns)
-        await manager.state.set("only_wide", "wv", wide_ns)  # 窄 scope 无此 key
+        manager.state.set("shared", "narrow", narrow_ns)
+        manager.state.set("shared", "wide", wide_ns)
+        manager.state.set("only_wide", "wv", wide_ns)  # 窄 scope 无此 key
 
-        result = await manager.state.get_all([narrow_ns, wide_ns])
+        result = manager.state.get_all([narrow_ns, wide_ns])
         assert result["shared"] == "narrow"   # 同 key 窄覆盖宽
         assert result["only_wide"] == "wv"    # 窄缺值 → 宽值保留（不被抹除）
 
@@ -14174,10 +14180,10 @@ class TestRound12StateNarrowWideUnit:
         wide_ns = manager.get_namespace("wide", "state")
 
         # 先写窄、后写宽：合并顺序由 priority 决定，窄仍是最终值
-        await manager.state.set("theme", "narrow-first", narrow_ns)
-        await manager.state.set("theme", "wide-later", wide_ns)
+        manager.state.set("theme", "narrow-first", narrow_ns)
+        manager.state.set("theme", "wide-later", wide_ns)
 
-        result = await manager.state.get_all([narrow_ns, wide_ns])
+        result = manager.state.get_all([narrow_ns, wide_ns])
         assert result["theme"] == "narrow-first"
 
 
@@ -14223,16 +14229,16 @@ class TestRound12StateNarrowWideE2E:
         assert nss == ["narrow:n1:state", "mid:m1:state", "wide:w1:state"]
 
         # shared key: narrow 有值 → 覆盖 mid/wide
-        await manager.state.set("shared", "narrow", nss[0])
-        await manager.state.set("shared", "mid", nss[1])
-        await manager.state.set("shared", "wide", nss[2])
+        manager.state.set("shared", "narrow", nss[0])
+        manager.state.set("shared", "mid", nss[1])
+        manager.state.set("shared", "wide", nss[2])
         # only in mid & wide（narrow 无）
-        await manager.state.set("only_mid_wide", "mv", nss[1])
-        await manager.state.set("only_mid_wide", "wv", nss[2])
+        manager.state.set("only_mid_wide", "mv", nss[1])
+        manager.state.set("only_mid_wide", "wv", nss[2])
         # only in wide（narrow & mid 均无）
-        await manager.state.set("only_wide", "wv2", nss[2])
+        manager.state.set("only_wide", "wv2", nss[2])
 
-        result = await manager.state.get_all(nss)
+        result = manager.state.get_all(nss)
         assert result["shared"] == "narrow"
         assert result["only_mid_wide"] == "mv"   # mid(priority 10)比 wide 窄 → mid 胜出
         assert result["only_wide"] == "wv2"      # 窄/中无值 → 宽值呈现
@@ -14438,7 +14444,7 @@ class TestRound12ScheduledNoPhantomUnit:
         agent._system_prompt = "System"
         agent._memory = MagicMock()
         agent._memory.get_namespaces = MagicMock(return_value=[])  # 无任何 state ns
-        agent._memory.state.set = AsyncMock()
+        agent._memory.state.set = MagicMock()
 
         loop = ScheduledLoop()
         loop.on_start = AsyncMock()
@@ -14724,10 +14730,10 @@ class TestRound13StateGetAllNoneUnit:
         nss = manager.get_namespaces("state")
         assert nss == ["narrow:n1:state", "wide:w1:state"]
 
-        await manager.state.set("theme", "narrow-theme", nss[0])
-        await manager.state.set("theme", "wide-theme", nss[1])
+        manager.state.set("theme", "narrow-theme", nss[0])
+        manager.state.set("theme", "wide-theme", nss[1])
 
-        result = await manager.state.get_all()   # 无参数路径（本轮修复核心）
+        result = manager.state.get_all()   # 无参数路径（本轮修复核心）
         assert result["theme"] == "narrow-theme", "get_all(None) 应窄覆盖宽"
 
     @pytest.mark.asyncio
@@ -14744,11 +14750,11 @@ class TestRound13StateGetAllNoneUnit:
         manager.activate_scopes({"narrow_id": "n1", "wide_id": "w1"})
         nss = manager.get_namespaces("state")
 
-        await manager.state.set("theme", "narrow-theme", nss[0])
-        await manager.state.set("theme", "wide-theme", nss[1])
+        manager.state.set("theme", "narrow-theme", nss[0])
+        manager.state.set("theme", "wide-theme", nss[1])
 
-        result_none = await manager.state.get_all()
-        result_explicit = await manager.state.get_all(nss)
+        result_none = manager.state.get_all()
+        result_explicit = manager.state.get_all(nss)
         assert result_none == result_explicit == {"theme": "narrow-theme"}
 
 
@@ -14858,8 +14864,8 @@ class TestRound13TTLAccessTypeE2E:
         stream_ns = "session:s1:stream"
         state_ns = "session:s1:state"
 
-        await manager.stream.append({"role": "user", "content": "temp stream"}, stream_ns)
-        await manager.state.set("k", "persistent state", state_ns)
+        manager.stream.append({"role": "user", "content": "temp stream"}, stream_ns)
+        manager.state.set("k", "persistent state", state_ns)
 
         backend = manager._get_backend_for_namespace(stream_ns)
         cursor = backend.conn.execute(
@@ -14870,8 +14876,8 @@ class TestRound13TTLAccessTypeE2E:
 
         time.sleep(0.1)
         # stream 已过期被读取路径排除；state 长 TTL 仍持久
-        assert await manager.stream.last(10, [stream_ns]) == []
-        assert await manager.state.get("k", state_ns) == "persistent state"
+        assert manager.stream.last(10, [stream_ns]) == []
+        assert manager.state.get("k", state_ns) == "persistent state"
 
 
 class TestRound13FileBackendE2E:
@@ -14907,12 +14913,12 @@ class TestRound13FileBackendE2E:
         stream_ns = "session:s1:stream"
         state_ns = "session:s1:state"
 
-        await manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
-        await manager.state.set("k", "v", state_ns)
+        manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
+        manager.state.set("k", "v", state_ns)
 
         time.sleep(0.1)
-        assert await manager.stream.last(10, [stream_ns]) == [], "FileBackend stream 过期条目应被过滤"
-        assert await manager.state.get("k", state_ns) == "v", "FileBackend state 长 TTL 应持久"
+        assert manager.stream.last(10, [stream_ns]) == [], "FileBackend stream 过期条目应被过滤"
+        assert manager.state.get("k", state_ns) == "v", "FileBackend state 长 TTL 应持久"
 
 
 class TestRound13StateGetAllNoneE2E:
@@ -14948,11 +14954,11 @@ class TestRound13StateGetAllNoneE2E:
 
         nss = manager.get_namespaces("state")
         assert nss == ["narrow:n1:state", "wide:w1:state"]
-        await manager.state.set("theme", "narrow", nss[0])
-        await manager.state.set("theme", "wide", nss[1])
-        await manager.state.set("only_wide", "wv", nss[1])
+        manager.state.set("theme", "narrow", nss[0])
+        manager.state.set("theme", "wide", nss[1])
+        manager.state.set("only_wide", "wv", nss[1])
 
-        result = await manager.state.get_all()   # 无参数路径
+        result = manager.state.get_all()   # 无参数路径
         assert result["theme"] == "narrow", "get_all(None) 同 key 窄覆盖宽"
         assert result["only_wide"] == "wv", "窄缺值 → 宽值保留"
 
@@ -15015,8 +15021,8 @@ class TestRound13StatsE2E:
         stream_ns = "session:s1:stream"
         know_ns = "session:s1:knowledge"
 
-        await manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
-        await manager.knowledge.add("permanent knowledge", know_ns)
+        manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
+        manager.knowledge.add("permanent knowledge", know_ns)
 
         time.sleep(0.1)
         stats = manager.stats()
@@ -15305,7 +15311,7 @@ class TestRound15StateGetAllNoneUnit:
         from weave_agent_sdk.types import MemoryConfig
 
         manager = MemoryManager(MemoryConfig(default_path=":memory:"))
-        assert await manager.state.get_all() == {}
+        assert manager.state.get_all() == {}
 
     @pytest.mark.asyncio
     async def test_get_all_none_three_scopes_narrow_wins_and_unions(self):
@@ -15322,12 +15328,12 @@ class TestRound15StateGetAllNoneUnit:
 
         nss = manager.get_namespaces("state")
         assert nss == ["narrow:n1:state", "mid:m1:state", "wide:w1:state"]
-        await manager.state.set("shared", "narrow", nss[0])
-        await manager.state.set("shared", "mid", nss[1])
-        await manager.state.set("shared", "wide", nss[2])
-        await manager.state.set("only_wide", "wv", nss[2])
+        manager.state.set("shared", "narrow", nss[0])
+        manager.state.set("shared", "mid", nss[1])
+        manager.state.set("shared", "wide", nss[2])
+        manager.state.set("only_wide", "wv", nss[2])
 
-        result = await manager.state.get_all()
+        result = manager.state.get_all()
         assert result["shared"] == "narrow", "get_all(None) 最窄 scope 覆盖同 key"
         assert result["only_wide"] == "wv", "窄/中缺值 → 宽值保留"
 
@@ -15445,14 +15451,14 @@ class TestRound15TTLAccessTypeE2E:
         state_ns = "session:s1:state"
         know_ns = "session:s1:knowledge"
 
-        await manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
-        await manager.state.set("k", "persistent", state_ns)
-        await manager.knowledge.add("persistent knowledge", know_ns)
+        manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
+        manager.state.set("k", "persistent", state_ns)
+        manager.knowledge.add("persistent knowledge", know_ns)
 
         time.sleep(0.1)
-        assert await manager.stream.last(10, [stream_ns]) == [], "stream 短 TTL 过期应被过滤"
-        assert await manager.state.get("k", state_ns) == "persistent", "state 无 ttl 应持久"
-        assert len(await manager.knowledge.search("persistent", [know_ns], 5)) == 1, "knowledge 无 ttl 应持久"
+        assert manager.stream.last(10, [stream_ns]) == [], "stream 短 TTL 过期应被过滤"
+        assert manager.state.get("k", state_ns) == "persistent", "state 无 ttl 应持久"
+        assert len(manager.knowledge.search("persistent", [know_ns], 5)) == 1, "knowledge 无 ttl 应持久"
 
 
 class TestRound15FileBackendE2E:
@@ -15492,14 +15498,14 @@ class TestRound15FileBackendE2E:
         state_ns = "session:s1:state"
         know_ns = "session:s1:knowledge"
 
-        await manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
-        await manager.state.set("k", "persist", state_ns)
-        await manager.knowledge.add("persist knowledge", know_ns)
+        manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
+        manager.state.set("k", "persist", state_ns)
+        manager.knowledge.add("persist knowledge", know_ns)
 
         time.sleep(0.1)
-        assert await manager.stream.last(10, [stream_ns]) == [], "FileBackend stream 过期应被过滤"
-        assert await manager.state.get("k", state_ns) == "persist", "FileBackend state 长 TTL 应持久"
-        assert len(await manager.knowledge.search("persist", [know_ns], 5)) == 1, "FileBackend knowledge 无 TTL 应持久"
+        assert manager.stream.last(10, [stream_ns]) == [], "FileBackend stream 过期应被过滤"
+        assert manager.state.get("k", state_ns) == "persist", "FileBackend state 长 TTL 应持久"
+        assert len(manager.knowledge.search("persist", [know_ns], 5)) == 1, "FileBackend knowledge 无 TTL 应持久"
 
 
 class TestRound15StateGetAllNoneE2E:
@@ -15542,13 +15548,13 @@ class TestRound15StateGetAllNoneE2E:
 
         nss = manager.get_namespaces("state")
         assert nss == ["narrow:n1:state", "mid:m1:state", "wide:w1:state"]
-        await manager.state.set("shared", "narrow", nss[0])
-        await manager.state.set("shared", "mid", nss[1])
-        await manager.state.set("shared", "wide", nss[2])
-        await manager.state.set("only_mid", "mv", nss[1])
-        await manager.state.set("only_wide", "wv", nss[2])
+        manager.state.set("shared", "narrow", nss[0])
+        manager.state.set("shared", "mid", nss[1])
+        manager.state.set("shared", "wide", nss[2])
+        manager.state.set("only_mid", "mv", nss[1])
+        manager.state.set("only_wide", "wv", nss[2])
 
-        result = await manager.state.get_all()
+        result = manager.state.get_all()
         assert result["shared"] == "narrow"
         assert result["only_mid"] == "mv"
         assert result["only_wide"] == "wv"
@@ -15624,11 +15630,11 @@ class TestRound15StatsE2E:
         stream_ns = "session:s1:stream"
         state_ns = "session:s1:state"
 
-        await manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
-        await manager.state.set("k", "v", state_ns)
+        manager.stream.append({"role": "user", "content": "temp"}, stream_ns)
+        manager.state.set("k", "v", state_ns)
 
         time.sleep(0.1)
-        stats = manager.stats()
+        stats = manager.stats(purge=True)
         assert stats.get(stream_ns, 0) == 0, "stats() 应先回收过期 stream 条目"
         assert stats.get(state_ns, 0) == 1, "state 长 TTL 条目应正常计入"
 
@@ -15785,12 +15791,12 @@ class TestRound16StateGetAllNoneUnit:
         nss = manager.get_namespaces("state")
         assert nss == ["narrow:n1:state", "wide:w1:state"]
 
-        await manager.state.set("theme", "narrow", nss[0])
-        await manager.state.set("theme", "wide", nss[1])
-        assert (await manager.state.get_all())["theme"] == "narrow"
+        manager.state.set("theme", "narrow", nss[0])
+        manager.state.set("theme", "wide", nss[1])
+        assert (manager.state.get_all())["theme"] == "narrow"
 
-        await manager.state.delete("theme", nss[0])
-        result = await manager.state.get_all()
+        manager.state.delete("theme", nss[0])
+        result = manager.state.get_all()
         assert result["theme"] == "wide", "窄 scope 删除后宽 scope 值应浮现"
 
     @pytest.mark.asyncio
@@ -15805,11 +15811,11 @@ class TestRound16StateGetAllNoneUnit:
         manager.activate_scopes({"session_id": "s1"})
         ns = manager.get_namespace("session", "state")
 
-        await manager.state.set("k", "v", ns)
-        assert await manager.state.get_all() == {"k": "v"}
+        manager.state.set("k", "v", ns)
+        assert manager.state.get_all() == {"k": "v"}
 
         await asyncio.sleep(0.1)
-        assert await manager.state.get_all() == {}, "过期 state 条目不应出现在 get_all(None)"
+        assert manager.state.get_all() == {}, "过期 state 条目不应出现在 get_all(None)"
 
 
 class TestRound16SubscriptionRebuildUnit:
@@ -15909,7 +15915,7 @@ class TestRound16StatsUnit:
         )
         backend.conn.commit()
 
-        stats = manager.stats()
+        stats = manager.stats(purge=True)
         assert stats.get(ns_s) == 1
         assert stats.get(ns_st, 0) == 0
         assert stats.get(ns_k, 0) == 0
@@ -15953,7 +15959,7 @@ class TestRound16StatsUnit:
                 )
             backend.conn.commit()
 
-        stats = manager.stats()
+        stats = manager.stats(purge=True)
         assert stats.get(ns_a) == 1
         assert stats.get(ns_b, 0) == 0
         assert len(ba.conn.execute("SELECT id FROM memory_entries WHERE namespace = ?", (ns_a,)).fetchall()) == 1
@@ -16008,14 +16014,14 @@ class TestRound16TTLAccessSplitE2E:
         ns_st = "session:s1:state"
         ns_k = "session:s1:knowledge"
 
-        await manager.stream.append({"role": "user", "content": "temp stream"}, ns_s)
-        await manager.state.set("k", "persist", ns_st)
-        await manager.knowledge.add("temp knowledge", ns_k)
+        manager.stream.append({"role": "user", "content": "temp stream"}, ns_s)
+        manager.state.set("k", "persist", ns_st)
+        manager.knowledge.add("temp knowledge", ns_k)
 
         await asyncio.sleep(0.1)
-        assert await manager.stream.last(10, [ns_s]) == [], "stream 短 TTL 应过期"
-        assert await manager.state.get("k", ns_st) == "persist", "state 长 TTL 应持久"
-        assert await manager.knowledge.search("temp", [ns_k], 5) == [], "knowledge 短 TTL 应过期"
+        assert manager.stream.last(10, [ns_s]) == [], "stream 短 TTL 应过期"
+        assert manager.state.get("k", ns_st) == "persist", "state 长 TTL 应持久"
+        assert manager.knowledge.search("temp", [ns_k], 5) == [], "knowledge 短 TTL 应过期"
 
 
 class TestRound16BackendWiringE2E:
@@ -16054,12 +16060,12 @@ class TestRound16BackendWiringE2E:
         ns_s = "session:s1:stream"
         ns_st = "session:s1:state"
 
-        await manager.stream.append({"role": "user", "content": "temp"}, ns_s)
-        await manager.state.set("k", "v", ns_st)
+        manager.stream.append({"role": "user", "content": "temp"}, ns_s)
+        manager.state.set("k", "v", ns_st)
 
         await asyncio.sleep(0.1)
-        assert await manager.stream.last(10, [ns_s]) == [], "FileBackend stream 过期应被过滤"
-        assert await manager.state.get("k", ns_st) == "v", "SQLiteBackend state 长 TTL 应持久"
+        assert manager.stream.last(10, [ns_s]) == [], "FileBackend stream 过期应被过滤"
+        assert manager.state.get("k", ns_st) == "v", "SQLiteBackend state 长 TTL 应持久"
 
         # 后端类型接线正确
         assert isinstance(manager._get_backend_for_namespace(ns_s), FileBackend)
@@ -16101,13 +16107,13 @@ class TestRound16StateGetAllNoneE2E:
 
         nss = manager.get_namespaces("state")
         assert nss == ["narrow:n1:state", "wide:w1:state"]
-        await manager.state.set("theme", "narrow", nss[0])
-        await manager.state.set("theme", "wide", nss[1])
+        manager.state.set("theme", "narrow", nss[0])
+        manager.state.set("theme", "wide", nss[1])
 
-        assert (await manager.state.get_all())["theme"] == "narrow"
+        assert (manager.state.get_all())["theme"] == "narrow"
 
-        await manager.state.delete("theme", nss[0])
-        assert (await manager.state.get_all())["theme"] == "wide", "窄删除后宽值应浮现"
+        manager.state.delete("theme", nss[0])
+        assert (manager.state.get_all())["theme"] == "wide", "窄删除后宽值应浮现"
 
 
 class TestRound16SubscriptionRebuildE2E:
@@ -16178,12 +16184,12 @@ class TestRound16StatsE2E:
         ns_st = "session:s1:state"
         ns_k = "session:s1:knowledge"
 
-        await manager.stream.append({"role": "user", "content": "temp"}, ns_s)
-        await manager.state.set("k", "v", ns_st)
-        await manager.knowledge.add("temp knowledge", ns_k)
+        manager.stream.append({"role": "user", "content": "temp"}, ns_s)
+        manager.state.set("k", "v", ns_st)
+        manager.knowledge.add("temp knowledge", ns_k)
 
         await asyncio.sleep(0.1)
-        stats = manager.stats()
+        stats = manager.stats(purge=True)
         assert stats.get(ns_s, 0) == 0, "过期 stream 条目应被 stats() 清理"
         assert stats.get(ns_st, 0) == 1, "state 长 TTL 条目应计入"
         assert stats.get(ns_k, 0) == 0, "过期 knowledge 条目应被 stats() 清理"
@@ -16252,7 +16258,7 @@ class TestRound17ChromaKnowledgeTTLUnit:
     def test_knowledge_add_signature_has_ttl(self):
         """knowledge_add 方法签名应包含 ttl 形参（第17轮核心修复）。
 
-        此前 ChromaBackend.knowledge_add 无 ttl 形参，SQLiteKnowledgeMemory.add
+        此前 ChromaBackend.knowledge_add 无 ttl 形参，MemoryKnowledge.add
         以 4 个位置参数调用时抛 TypeError（review round-7 issue 1）。
         """
         import inspect
@@ -16447,7 +16453,7 @@ class TestRound17ChromaTTLE2E:
         collection = backend._get_collection(ns)
 
         # 经 manager 写入：knowledge_add 收到 manager 解析的 ttl → metadata 设 _expires_at
-        entry_id = await manager.knowledge.add("temporary knowledge", ns)
+        entry_id = manager.knowledge.add("temporary knowledge", ns)
         assert entry_id
         meta_a = collection.added[0]["metadatas"][0]
         assert meta_a["_expires_at"] is not None, "带 ttl 写入应设 _expires_at"
@@ -16459,16 +16465,16 @@ class TestRound17ChromaTTLE2E:
             "distances": [[0.0]],
             "metadatas": [[meta_a]],
         }
-        results = await manager.knowledge.search("temporary", [ns], 5)
+        results = manager.knowledge.search("temporary", [ns], 5)
         assert len(results) == 1 and results[0].content == "temporary knowledge"
 
         # 过期后：同一 entry 不再被查询返回
         await asyncio.sleep(0.1)
-        results2 = await manager.knowledge.search("temporary", [ns], 5)
+        results2 = manager.knowledge.search("temporary", [ns], 5)
         assert results2 == [], "过期条目应被 chroma 查询过滤"
 
         # 再写入一条新的（未过期）→ 命中；过期旧条目仍被过滤
-        fresh_id = await manager.knowledge.add("fresh knowledge", ns)
+        fresh_id = manager.knowledge.add("fresh knowledge", ns)
         meta_b = collection.added[1]["metadatas"][0]
         collection._query = {
             "ids": [[entry_id, fresh_id]],
@@ -16476,7 +16482,7 @@ class TestRound17ChromaTTLE2E:
             "distances": [[0.1, 0.2]],
             "metadatas": [[meta_a, meta_b]],
         }
-        results3 = await manager.knowledge.search("knowledge", [ns], 5)
+        results3 = manager.knowledge.search("knowledge", [ns], 5)
         assert len(results3) == 1
         assert results3[0].id == fresh_id
 
@@ -16512,7 +16518,7 @@ class TestRound17ChromaTTLE2E:
             "metadatas": [[{"_expires_at": now - 100}]],
         }
 
-        results = await manager.knowledge.search("query", None, 5)
+        results = manager.knowledge.search("query", None, 5)
 
         assert len(results) == 1
         assert results[0].id == "a-fresh"
@@ -16537,7 +16543,7 @@ class TestRound17BackendManagementE2E:
         ns = "session:s1:knowledge"
         backend = manager._get_backend_for_namespace(ns)
         backend._client = _FakeChromaClient()
-        await manager.knowledge.add("data", ns)
+        manager.knowledge.add("data", ns)
 
         with caplog.at_level(logging.WARNING, logger="weave_agent_sdk.memory.backends.chroma"):
             stats = manager.stats()
@@ -16915,9 +16921,9 @@ class TestRound19DefaultSharedDBUnit:
         assert s is st is k, "三种 access 共用同一 SQLite 后端（同一 db 文件）"
 
         # 三类写入落在同一文件/同一连接内，namespace_stats 可见全部
-        await manager.stream.append({"role": "user", "content": "hi"}, "session:s1:stream")
-        await manager.state.set("k", "v", "session:s1:state")
-        await manager.knowledge.add("alpha knowledge", "session:s1:knowledge")
+        manager.stream.append({"role": "user", "content": "hi"}, "session:s1:stream")
+        manager.state.set("k", "v", "session:s1:state")
+        manager.knowledge.add("alpha knowledge", "session:s1:knowledge")
 
         stats = s.namespace_stats()
         assert stats.get("session:s1:stream") == 1
@@ -17065,7 +17071,7 @@ class TestRound19TopKBeforeThinkE2E:
             "state": [],
             "knowledge": ["session:s1:knowledge"],
         }[at])
-        agent._memory.knowledge.search = AsyncMock(return_value=[
+        agent._memory.knowledge.search = MagicMock(return_value=[
             SimpleNamespace(content="kb result"),
         ])
 
@@ -17073,7 +17079,7 @@ class TestRound19TopKBeforeThinkE2E:
         ctx = await loop.before_think(agent, "retrieve something")
 
         assert ctx["knowledge"][0].content == "kb result"
-        agent._memory.knowledge.search.assert_awaited_once_with(
+        agent._memory.knowledge.search.assert_called_once_with(
             "retrieve something", ["session:s1:knowledge"], top_k=3
         )
 
@@ -17118,9 +17124,9 @@ class TestRound19DefaultSharedDBE2E:
         k = manager._get_backend_for_namespace("session:s1:knowledge")
         assert s is st is k
 
-        await manager.stream.append({"role": "user", "content": "hi"}, "session:s1:stream")
-        await manager.state.set("k", "v", "session:s1:state")
-        await manager.knowledge.add("alpha knowledge", "session:s1:knowledge")
+        manager.stream.append({"role": "user", "content": "hi"}, "session:s1:stream")
+        manager.state.set("k", "v", "session:s1:state")
+        manager.knowledge.add("alpha knowledge", "session:s1:knowledge")
 
         # 同一文件内三类数据全部可见（stats 含三个 namespace）
         stats = manager.stats()
@@ -17319,11 +17325,11 @@ class TestRound20TopKConfigUnit:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": [], "state": [], "knowledge": ["session:s1:knowledge"],
         }[at])
-        agent._memory.knowledge.search = AsyncMock(return_value=[SimpleNamespace(content="r")])
+        agent._memory.knowledge.search = MagicMock(return_value=[SimpleNamespace(content="r")])
         loop = _Round1ConcreteLoop()
         ctx = await loop.before_think(agent, "q")
         assert ctx["knowledge"][0].content == "r"
-        agent._memory.knowledge.search.assert_awaited_once_with("q", ["session:s1:knowledge"], top_k=5)
+        agent._memory.knowledge.search.assert_called_once_with("q", ["session:s1:knowledge"], top_k=5)
 
     @pytest.mark.asyncio
     async def test_before_think_topk_nonint_falls_back_to_default(self):
@@ -17337,11 +17343,11 @@ class TestRound20TopKConfigUnit:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": [], "state": [], "knowledge": ["session:s1:knowledge"],
         }[at])
-        agent._memory.knowledge.search = AsyncMock(return_value=[SimpleNamespace(content="r")])
+        agent._memory.knowledge.search = MagicMock(return_value=[SimpleNamespace(content="r")])
         loop = _Round1ConcreteLoop()
         ctx = await loop.before_think(agent, "q")
         assert ctx["knowledge"][0].content == "r"
-        agent._memory.knowledge.search.assert_awaited_once_with("q", ["session:s1:knowledge"], top_k=5)
+        agent._memory.knowledge.search.assert_called_once_with("q", ["session:s1:knowledge"], top_k=5)
 
 
 class TestRound20DefaultSharedDBUnit:
@@ -17369,14 +17375,14 @@ class TestRound20DefaultSharedDBUnit:
         k = manager._get_backend_for_namespace("session:s1:knowledge")
         assert s is st is k
 
-        await manager.stream.append({"role": "user", "content": "hi"}, "session:s1:stream")
-        await manager.state.set("k", "v", "session:s1:state")
-        await manager.knowledge.add("alpha knowledge", "session:s1:knowledge")
+        manager.stream.append({"role": "user", "content": "hi"}, "session:s1:stream")
+        manager.state.set("k", "v", "session:s1:state")
+        manager.knowledge.add("alpha knowledge", "session:s1:knowledge")
 
-        last = await manager.stream.last(5, ["session:s1:stream"])
+        last = manager.stream.last(5, ["session:s1:stream"])
         assert any(e.get("content") == "hi" for e in last)
-        assert await manager.state.get("k", "session:s1:state") == "v"
-        results = await manager.knowledge.search("alpha", ["session:s1:knowledge"], top_k=5)
+        assert manager.state.get("k", "session:s1:state") == "v"
+        results = manager.knowledge.search("alpha", ["session:s1:knowledge"], top_k=5)
         assert any(r.content == "alpha knowledge" for r in results)
 
 
@@ -17542,12 +17548,12 @@ class TestRound20TopKBeforeThinkE2E:
         agent._memory.get_namespaces = MagicMock(side_effect=lambda at: {
             "stream": [], "state": [], "knowledge": ["session:s1:knowledge"],
         }[at])
-        agent._memory.knowledge.search = AsyncMock(return_value=[SimpleNamespace(content="r")])
+        agent._memory.knowledge.search = MagicMock(return_value=[SimpleNamespace(content="r")])
 
         loop = _Round1ConcreteLoop()
         ctx = await loop.before_think(agent, "retrieve something")
         assert ctx["knowledge"][0].content == "r"
-        agent._memory.knowledge.search.assert_awaited_once_with(
+        agent._memory.knowledge.search.assert_called_once_with(
             "retrieve something", ["session:s1:knowledge"], top_k=5
         )
 
@@ -17586,22 +17592,22 @@ class TestRound20DefaultSharedDBE2E:
         manager = MemoryManager(config.memory)
         manager.activate_scopes({"session_id": "s1"})
 
-        await manager.stream.append({"role": "user", "content": "hello shared"}, "session:s1:stream")
-        await manager.state.set("k", "v", "session:s1:state")
-        await manager.knowledge.add("shared knowledge alpha", "session:s1:knowledge")
+        manager.stream.append({"role": "user", "content": "hello shared"}, "session:s1:stream")
+        manager.state.set("k", "v", "session:s1:state")
+        manager.knowledge.add("shared knowledge alpha", "session:s1:knowledge")
 
         # 读路径跨 access 在同一文件内全部可见
-        last = await manager.stream.last(5, ["session:s1:stream"])
+        last = manager.stream.last(5, ["session:s1:stream"])
         assert any(e.get("content") == "hello shared" for e in last)
-        assert await manager.state.get("k", "session:s1:state") == "v"
-        results = await manager.knowledge.search("shared knowledge", ["session:s1:knowledge"], top_k=5)
+        assert manager.state.get("k", "session:s1:state") == "v"
+        results = manager.knowledge.search("shared knowledge", ["session:s1:knowledge"], top_k=5)
         assert any(r.content == "shared knowledge alpha" for r in results)
 
         # 释放连接后，新 manager（同一 db 路径）跨运行读取既有数据（持久化验证）
         manager.close()
         manager2 = MemoryManager(config.memory)
         manager2.activate_scopes({"session_id": "s1"})
-        assert await manager2.state.get("k", "session:s1:state") == "v"
+        assert manager2.state.get("k", "session:s1:state") == "v"
 
 
 class TestRound20SubscriptionGCE2E:
@@ -17681,8 +17687,8 @@ class TestRound20BackendNoPathChromaE2E:
         assert isinstance(k, ChromaBackend)
 
         # state 写入落默认 sqlite 后端，读回可见
-        await manager.state.set("k", "v", "session:s1:state")
-        assert await manager.state.get("k", "session:s1:state") == "v"
+        manager.state.set("k", "v", "session:s1:state")
+        assert manager.state.get("k", "session:s1:state") == "v"
 
         # 管理面 cleanup/stats 全程不崩溃（chroma 被安全跳过）
         manager.cleanup()

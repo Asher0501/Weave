@@ -6,7 +6,7 @@ from typing import Any
 from weave_agent_sdk.types import SearchResult
 
 
-class SQLiteKnowledgeMemory:
+class MemoryKnowledge:
     """SQLite 后端的 KnowledgeMemory 实现（LIKE 关键词搜索）。"""
 
     def __init__(self, manager: Any):  # MemoryManager
@@ -15,13 +15,13 @@ class SQLiteKnowledgeMemory:
     def _backend(self, namespace: str) -> Any:
         return self._manager._get_backend_for_namespace(namespace)
 
-    async def add(self, content: str, namespace: str, metadata: dict[str, Any] | None = None) -> str:
+    def add(self, content: str, namespace: str, metadata: dict[str, Any] | None = None) -> str:
         # TTL：由 manager 按 namespace 解析 scope 配置，后端写入时计算
         # expires_at=created_at+ttl（review round-4 issue 1）
         ttl = self._manager._ttl_for_namespace(namespace)
         return self._backend(namespace).knowledge_add(content, namespace, metadata, ttl)
 
-    async def search(self, query: str, namespaces: list[str] | None = None, top_k: int = 5) -> list[SearchResult]:
+    def search(self, query: str, namespaces: list[str] | None = None, top_k: int = 5) -> list[SearchResult]:
         if not namespaces:
             # 无参数路径：先按激活 scope 的 knowledge namespace 解析并实例化
             # 后端。MemoryManager._backends 是懒加载的——新进程（尚未发生任何

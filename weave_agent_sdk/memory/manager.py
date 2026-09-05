@@ -8,9 +8,9 @@ from typing import Any
 from weave_agent_sdk.memory.backends.sqlite import SQLiteBackend
 from weave_agent_sdk.memory.backends.file import FileBackend
 from weave_agent_sdk.memory.backends.chroma import ChromaBackend
-from weave_agent_sdk.memory.stream import SQLiteStreamMemory
-from weave_agent_sdk.memory.state import SQLiteStateMemory
-from weave_agent_sdk.memory.knowledge import SQLiteKnowledgeMemory
+from weave_agent_sdk.memory.stream import MemoryStream
+from weave_agent_sdk.memory.state import MemoryState
+from weave_agent_sdk.memory.knowledge import MemoryKnowledge
 from weave_agent_sdk.types import MemoryConfig, MemoryScopeConfig, SearchResult
 from weave_agent_sdk.registry import Registry
 
@@ -76,16 +76,16 @@ class MemoryManager:
         self._active_scopes = active
 
     @property
-    def stream(self) -> "SQLiteStreamMemory":
-        return SQLiteStreamMemory(self)
+    def stream(self) -> "MemoryStream":
+        return MemoryStream(self)
 
     @property
-    def state(self) -> "SQLiteStateMemory":
-        return SQLiteStateMemory(self)
+    def state(self) -> "MemoryState":
+        return MemoryState(self)
 
     @property
-    def knowledge(self) -> "SQLiteKnowledgeMemory":
-        return SQLiteKnowledgeMemory(self)
+    def knowledge(self) -> "MemoryKnowledge":
+        return MemoryKnowledge(self)
 
     def _get_backend_for_namespace(self, namespace: str) -> Any:
         """根据 namespace 解析对应的后端实例。
@@ -286,17 +286,22 @@ class MemoryManager:
             backend.close()
         self._backends.clear()
 
-    def stats(self) -> dict[str, int]:
+    def stats(self, purge: bool = False) -> dict[str, int]:
         """返回各 namespace 的统计信息。
 
-        统计前先做一次过期清理：读多写少的 Agent（scheduled 监控、纯查询）
-        写路径清理触发频率低，过期条目会持续堆积且统计虚高。在统计/管理面
-        触发全量清理，保证 TTL"记忆可过期"语义在管理面一致
-        （review round-6 issue 5）。清理与统计均由各后端按过期条件处理。
-        cleanup() 内部会先实例化激活 scope 的后端，新进程 _backends 为空
+        Args:
+            purge: 是否在统计前先清理过期条目。默认 False——统计是只读操作，
+                不应有写库副作用（status() 等查询路径据此保持纯读）；过期数据
+                由写路径被动清理 + 显式 cleanup() 回收。True 时保留"统计即清理"
+                的旧语义（读多写少场景可借统计时机回收过期条目）。
+
+        无论是否 purge，都会先实例化激活 scope 的后端——新进程 _backends 为空
         时统计也能反映既有 DB（review round-8 issue 1）。
         """
-        self.cleanup()
+        if purge:
+            self.cleanup()
+        else:
+            self._ensure_configured_backends()
         all_stats: dict[str, int] = {}
         for backend in self._backends.values():
             all_stats.update(backend.namespace_stats())

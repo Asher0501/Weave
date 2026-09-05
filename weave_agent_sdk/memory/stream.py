@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 
-class SQLiteStreamMemory:
+class MemoryStream:
     """SQLite 后端的 StreamMemory 实现。"""
 
     def __init__(self, manager: Any):  # MemoryManager
@@ -13,13 +13,13 @@ class SQLiteStreamMemory:
     def _backend(self, namespace: str) -> Any:
         return self._manager._get_backend_for_namespace(namespace)
 
-    async def append(self, entry: dict[str, Any], namespace: str) -> str:
+    def append(self, entry: dict[str, Any], namespace: str) -> str:
         # TTL：由 manager 按 namespace 解析 scope 配置，后端写入时计算
         # expires_at=created_at+ttl（review round-4 issue 1）
         ttl = self._manager._ttl_for_namespace(namespace)
         return self._backend(namespace).stream_append(entry, namespace, ttl)
 
-    async def last(self, n: int = 20, namespaces: list[str] | None = None) -> list[dict[str, Any]]:
+    def last(self, n: int = 20, namespaces: list[str] | None = None) -> list[dict[str, Any]]:
         """获取最近的 n 条 stream 记录。
 
         当 namespaces 为 None 时，收集所有 backend 的数据并按时间合并排序，
@@ -102,10 +102,10 @@ class SQLiteStreamMemory:
         top_n.reverse()
         return top_n
 
-    async def trim(self, max_items: int, namespace: str) -> None:
+    def trim(self, max_items: int, namespace: str) -> None:
         self._backend(namespace).stream_trim(max_items, namespace)
 
-    async def delete_after(self, watermark: float, namespace: str) -> int:
+    def delete_after(self, watermark: float, namespace: str) -> int:
         """删除 created_at > watermark 的 stream 条目（用于状态回滚）。
 
         Args:

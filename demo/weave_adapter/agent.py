@@ -61,7 +61,7 @@ class PersonaAgent:
         self._activate(None)
         sns = self._ns("world", "state")
         contents = [f.content for f in facts]
-        await self._weave.memory.state.set(
+        self._weave.memory.state.set(
             self._m["state_keys"]["objective_facts"], contents, sns
         )
         self._seeded_facts = contents
@@ -80,7 +80,7 @@ class PersonaAgent:
         # 把该人设的处理结果保存到它自己的私有 state（演示"保存隔离"）
         self._activate(persona.id)
         sns = self._ns("persona", "state")
-        await self._weave.memory.state.set(
+        self._weave.memory.state.set(
             self._m["state_keys"]["last_answer"], result.output, sns
         )
         return PersonaAnswer(persona.id, persona.name, result.output)
@@ -92,8 +92,8 @@ class PersonaAgent:
             self._activate(p.id)
             sns = self._ns("persona", "stream")
             st_ns = self._ns("persona", "state")
-            history = await self._weave.memory.stream.last(1000, [sns])
-            last_answer = await self._weave.memory.state.get(
+            history = self._weave.memory.stream.last(1000, [sns])
+            last_answer = self._weave.memory.state.get(
                 self._m["state_keys"]["last_answer"], st_ns
             )
             report.personas.append(PersonaMemorySnapshot(

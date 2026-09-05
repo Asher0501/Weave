@@ -52,7 +52,7 @@ class CheckpointManager:
     async def _load_checkpoints(self, ns: str) -> dict[str, dict[str, Any]]:
         """读取 namespace 下所有 checkpoint（过滤 __checkpoint_ 前缀），
         返回 {checkpoint_id: 快照}。"""
-        all_state = await self._memory.state.get_all([ns])
+        all_state = self._memory.state.get_all([ns])
         return {
             k[len(_CP_PREFIX):]: v
             for k, v in all_state.items()
@@ -72,7 +72,7 @@ class CheckpointManager:
         # 快照 state（每个 namespace 的完整键值）
         state_snapshot: dict[str, dict[str, Any]] = {}
         for ns in state_ns:
-            state_snapshot[ns] = await self._memory.state.get_all([ns])
+            state_snapshot[ns] = self._memory.state.get_all([ns])
 
         # watermark = 快照时刻，用于 stream 回滚的精确分隔
         watermark = time.time()
@@ -88,7 +88,7 @@ class CheckpointManager:
         }
 
         ns = self._checkpoint_namespace()
-        await self._memory.state.set(self._cp_key(cp_id), cp_value, ns)
+        self._memory.state.set(self._cp_key(cp_id), cp_value, ns)
 
         await self._enforce_keep(ns)
         return cp_id
@@ -129,20 +129,20 @@ class CheckpointManager:
 
         # 回滚 state：清空"宿主 state 键"（保留 checkpoint 自身的键）再恢复快照值
         for state_ns, snapshot in cp.get("state", {}).items():
-            keys = await self._memory.state.list(state_ns)
+            keys = self._memory.state.list(state_ns)
             for k in keys:
                 if k.startswith(_CP_PREFIX):
                     continue  # 不删除 checkpoint 自身
-                await self._memory.state.delete(k, state_ns)
+                self._memory.state.delete(k, state_ns)
             for k, v in snapshot.items():
                 if k.startswith(_CP_PREFIX):
                     continue  # 快照里不该有 checkpoint 键，防御性跳过
-                await self._memory.state.set(k, v, state_ns)
+                self._memory.state.set(k, v, state_ns)
 
         # 回滚 stream：删除快照后新增的条目
         watermark = float(cp.get("stream_watermark", 0.0))
         for stream_ns in cp.get("stream_namespaces", []):
-            await self._memory.stream.delete_after(watermark, stream_ns)
+            self._memory.stream.delete_after(watermark, stream_ns)
 
         return cp["id"]
 
@@ -157,4 +157,4 @@ class CheckpointManager:
         sorted_cps = sorted(cps.items(), key=lambda x: x[1].get("created_at", 0.0))
         to_delete = sorted_cps[: len(sorted_cps) - keep]
         for cp_id, _ in to_delete:
-            await self._memory.state.delete(self._cp_key(cp_id), namespace)
+            self._memory.state.delete(self._cp_key(cp_id), namespace)

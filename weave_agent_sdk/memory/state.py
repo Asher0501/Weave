@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 
-class SQLiteStateMemory:
+class MemoryState:
     """SQLite 后端的 StateMemory 实现。"""
 
     def __init__(self, manager: Any):  # MemoryManager
@@ -13,19 +13,19 @@ class SQLiteStateMemory:
     def _backend(self, namespace: str) -> Any:
         return self._manager._get_backend_for_namespace(namespace)
 
-    async def get(self, key: str, namespace: str) -> Any | None:
+    def get(self, key: str, namespace: str) -> Any | None:
         return self._backend(namespace).state_get(key, namespace)
 
-    async def set(self, key: str, value: Any, namespace: str) -> str:
+    def set(self, key: str, value: Any, namespace: str) -> str:
         # TTL：由 manager 按 namespace 解析 scope 配置，后端写入时计算
         # expires_at=created_at+ttl（review round-4 issue 1）
         ttl = self._manager._ttl_for_namespace(namespace)
         return self._backend(namespace).state_set(key, value, namespace, ttl)
 
-    async def delete(self, key: str, namespace: str) -> None:
+    def delete(self, key: str, namespace: str) -> None:
         self._backend(namespace).state_delete(key, namespace)
 
-    async def get_all(self, namespaces: list[str] | None = None) -> dict[str, Any]:
+    def get_all(self, namespaces: list[str] | None = None) -> dict[str, Any]:
         """读取所有 state 键值。
 
         无参数路径（namespaces=None）同样基于激活 scope 的 namespace 列表
@@ -52,7 +52,7 @@ class SQLiteStateMemory:
             results.update(partial)
         return results
 
-    async def list(self, namespace: str) -> list[str]:
+    def list(self, namespace: str) -> list[str]:
         """列出指定 namespace 下所有 key。"""
         backend = self._backend(namespace)
         # Not directly supported; iterate via get_all

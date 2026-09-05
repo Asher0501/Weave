@@ -75,7 +75,7 @@ class ChromaBackend:
             namespace: 命名空间（决定 collection）
             metadata: 附加元数据
             ttl: 过期时间（秒）。此前 ChromaBackend 无 ttl 形参，而
-                SQLiteKnowledgeMemory.add 无条件以 4 个位置参数调用
+                MemoryKnowledge.add 无条件以 4 个位置参数调用
                 knowledge_add(content, namespace, metadata, ttl)——配置
                 `backend: chroma` 的 knowledge scope 后写入立即抛
                 TypeError（review round-7 issue 1）。ttl 记录到 metadata

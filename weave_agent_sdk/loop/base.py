@@ -74,7 +74,7 @@ class BaseLoop(ABC):
                 stream = []
                 for ns in stream_ns:
                     ns_run_writes = writes.get(ns, 0)
-                    ns_entries = await agent._memory.stream.last(limit + ns_run_writes, [ns])
+                    ns_entries = agent._memory.stream.last(limit + ns_run_writes, [ns])
                     if ns_run_writes > 0:
                         ns_entries = ns_entries[:-ns_run_writes] if len(ns_entries) > ns_run_writes else []
                     stream.extend(ns_entries)
@@ -86,7 +86,7 @@ class BaseLoop(ABC):
 
         if state_ns:
             try:
-                state = await agent._memory.state.get_all(state_ns)
+                state = agent._memory.state.get_all(state_ns)
             except Exception as e:
                 logger.warning("before_think: state read failed: %s", e)
                 state = {}
@@ -103,7 +103,7 @@ class BaseLoop(ABC):
                 top_k = getattr(agent._config.loop, "memory_knowledge_topk", 5)
                 if not isinstance(top_k, int) or top_k <= 0:
                     top_k = 5
-                knowledge = await agent._memory.knowledge.search(current_input, knowledge_ns, top_k=top_k)
+                knowledge = agent._memory.knowledge.search(current_input, knowledge_ns, top_k=top_k)
             except Exception as e:
                 logger.warning("before_think: knowledge search failed: %s", e)
                 knowledge = []
@@ -202,7 +202,7 @@ async def _persist_stream_entry(agent: Any, entry: dict[str, Any]) -> None:
         return
     try:
         for ns in namespaces:
-            await agent._memory.stream.append(entry, ns)
+            agent._memory.stream.append(entry, ns)
         counter = getattr(agent, "__dict__", {}).get("_memory_writes")
         if counter is None:
             counter = {}

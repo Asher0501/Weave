@@ -104,7 +104,7 @@ class SQLiteBackend:
         """查询最近的 n 条 stream 记录。
 
         返回的内容 dict 中会包含 _created_at 内部字段，用于跨 backend 合并时排序。
-        调用方（SQLiteStreamMemory.last）在跨 backend 合并后会清理该字段。
+        调用方（MemoryStream.last）在跨 backend 合并后会清理该字段。
         """
         if not namespaces:
             namespaces = self._all_stream_namespaces()
