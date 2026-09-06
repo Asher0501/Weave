@@ -22,7 +22,7 @@ from weave_agent_sdk.types import (
 )
 
 # 版本号单点声明（pyproject.toml 经 dynamic 从本处读取，见 [tool.setuptools.dynamic]）
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
 # ── 插件注册（docs/issues/010） ──────────────────────────
