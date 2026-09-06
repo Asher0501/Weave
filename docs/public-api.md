@@ -15,14 +15,14 @@
 
 | 方法 | 签名 | 说明 |
 |------|------|------|
-| `__init__` | `(config_path: str = "weave.yaml", *, llm: BaseLLM \| None = None, loop: BaseLoop \| None = None)` | 加载配置并初始化；`llm=` / `loop=` 为运行期注入（离线/测试逃生口） |
+| `__init__` | `(config_path: str \| Path \| None = None, *, config: WeaveConfig \| None = None, llm: BaseLLM \| None = None, loop: BaseLoop \| None = None)` | 三种构造：`Weave()` 零配置 / `Weave(path)` 读文件 / `Weave(config=...)` 程序化；`llm=` / `loop=` 为运行期注入 |
 | `run()` | `(input: str, scope_hints: dict \| None = None, context: dict \| None = None, tool_filter: list[str] \| None = None) -> LoopResult` | 同步执行 |
 | `arun()` | `(input: str, scope_hints: dict \| None = None, context: dict \| None = None, tool_filter: list[str] \| None = None) -> LoopResult` | 异步执行 |
-| `stream()` | `(input: str, scope_hints: dict \| None = None, context: dict \| None = None) -> AsyncIterator[WeaveEvent]` | 流式执行 |
-| `tool()` | `(fn: Callable) -> Callable` | 装饰器注册 tool |
-| `register_tool()` | `(fn: Callable) -> None` | 直接注册 tool |
-| `on()` | `(*event_types: str) -> AsyncIterator[WeaveEvent]` | 订阅事件 |
-| `emit()` | `(event_type: str, data: dict \| None = None) -> None` | 发布事件 |
+| `stream()` | `(input: str, scope_hints: dict \| None = None, context: dict \| None = None, tool_filter: list[str] \| None = None) -> AsyncIterator[WeaveEvent]` | 流式执行 |
+| `tool()` | `(fn: Callable = None, *, name: str \| None = None, description: str \| None = None, schema: dict \| None = None) -> Callable` | 装饰器注册 tool，可显式覆盖 name/description/schema |
+| `register_tool()` | `(fn: Callable, *, name: str \| None = None, description: str \| None = None, schema: dict \| None = None) -> None` | 直接注册 tool（等价 `@weave.tool`） |
+| `on()` | `(*event_types: str) -> AsyncIterator[WeaveEvent]` | 订阅事件（async generator，`async for` 消费） |
+| `emit()` | `async (event_type: str, data: dict \| None = None) -> None` | 发布事件（需 `await`） |
 | `memory` | `-> MemoryManager` | Memory 公共访问入口 |
 | `status()` | `() -> dict` | 返回 Agent 状态 |
 | `checkpoint()` | `() -> str` | 手动打状态快照，返回 checkpoint_id |
@@ -54,9 +54,11 @@ LoopResult = namedtuple("LoopResult", [
 | `state.get_all()` | `(namespaces: list[str] \| None = None) -> dict[str, Any]` | 获取所有键值对 |
 | `knowledge.add()` | `(content: str, namespace: str, metadata: dict \| None = None) -> str` | 追加知识 |
 | `knowledge.search()` | `(query: str, namespaces: list[str] \| None = None, top_k: int = 5) -> list[SearchResult]` | 搜索知识 |
+| `activate_scopes()` | `(scope_hints: dict[str, str] \| None = None) -> None` | 激活作用域（`{scope_name}_id` → scope_id，未提供回退 scope_name） |
 | `get_namespaces()` | `(access_type: str) -> list[str]` | 获取指定类型的 namespace 列表 |
 | `get_namespace()` | `(scope_name: str, access_type: str) -> str` | 获取单个 namespace |
-| `stats()` | `() -> dict[str, int]` | namespace 统计 |
+| `active_scope_names` | `-> list[str]` | 已激活的 scope 名称列表 |
+| `stats()` | `(purge: bool = False) -> dict[str, int]` | namespace 统计（purge=True 先清理过期） |
 | `close()` | `() -> None` | 关闭所有后端连接 |
 | `cleanup()` | `() -> int` | 清理过期数据 |
 
@@ -97,6 +99,22 @@ LoopResult = namedtuple("LoopResult", [
 {"type": "tool_result", "name": str, "result": Any, "error": bool}
 {"type": "done",        "output": str, "elapsed_ms": int, "iterations": int}
 {"type": "error",       "message": str, "exception": str}
+```
+
+### 1.7 并发语义（重要行为契约）
+
+**同一个 `Weave` 实例对 `run()` / `arun()` / `stream()` 的调用是串行的**（每个事件循环一把锁）。这是为了隔离共享实例状态（`_is_running` / `_system_prompt` / `_tools` / 激活 scope / memory 写入计数），避免并发调用互相污染。
+
+需要并发时，**每个请求/协程新建一个 `Weave` 实例**（配置相同即可）。
+
+`emit()` / `on()` 示例：
+```python
+# 订阅事件（async generator，async for 消费）
+async for event in weave.on("token", "done"):
+    print(event.type, event.data)
+
+# 发布事件（async，需 await）
+await weave.emit("data_change", {"reason": "manual"})
 ```
 
 ---
@@ -162,12 +180,12 @@ register_memory_backend("redis", RedisBackend)       # backend: redis
 
 | 模块 | 内部接口 | 说明 |
 |------|---------|------|
-| `Weave` | `._config`, `._llm`, `._loop`, `._memory`, `._tools`, `._tool_map`, `._event_bus`, `._prompts`, `._system_prompt`, `._is_running`, `._last_run` | 内部状态 |
+| `Weave` | `._config`, `._llm`, `._loop`, `._memory`, `._tools`, `._tool_map`, `._tool_meta`, `._event_bus`, `._prompts`, `._system_prompt`, `._is_running`, `._last_run` | 内部状态 |
 | `Weave` | `._run_impl()`, `._create_loop()`, `._load_system_prompt()`, `._register_tool_internal()` | 内部方法 |
 | `MemoryManager` | `._backends`, `._active_scopes`, `._config` | 内部状态 |
-| `MemoryManager` | `._get_backend_for_namespace()`, `activate_scopes()` | 内部方法 |
+| `MemoryManager` | `._get_backend_for_namespace()` | 内部方法 |
 | `EventBus` | `._subscribers`, `._max_queue_size` | 内部状态 |
-| `Config` | `_resolve_env()`, `_load_claude_env()`, `_parse_memory_scopes()` | 内部函数 |
+| `Config` | `_resolve_env()`, `_parse_memory_scopes()` | 内部函数 |
 | `LLM` | `_auto_detect_provider()`, `_resolve_api_key()`, `_default_model()` | 内部函数 |
 | `IterativeLoop` | `_build_tool_schemas()`, `_execute_tool()`, `_is_finish_tool()`, `_format_tool_result()` | 内部 helper |
 

@@ -122,6 +122,19 @@ kb_global:default:knowledge → 全局知识库
 
 同一个 `Weave` 实例内，不同 `scope_hints` 天然隔离不同会话/人设的记忆——这是多租户、多人设场景的基础。
 
+`scope_hints` 是 `{scope_name}_id → scope_id` 的映射，在 `run()` / `arun()` 时传入：
+
+```python
+# weave.yaml 配置了 session / persona 两个 scope
+weave = Weave("weave.yaml")
+
+# 会话 A/B、人设 P1/P2 的记忆彼此隔离
+result_a = weave.run("问题", scope_hints={"session_id": "A", "persona_id": "P1"})
+result_b = weave.run("问题", scope_hints={"session_id": "B", "persona_id": "P2"})
+```
+
+未提供 `{scope_name}_id` 时，回退 scope_name 作为稳定的默认 scope_id（跨运行持久）。
+
 ---
 
 ## 架构

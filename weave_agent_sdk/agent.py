@@ -9,6 +9,7 @@ import inspect
 import logging
 import time
 from pathlib import Path, PurePath
+from collections.abc import AsyncIterator
 from typing import Any
 
 from weave_agent_sdk.config import load_config
@@ -134,7 +135,7 @@ class Weave:
         """异步入口。"""
         return await self._run_impl(input, scope_hints, context, tool_filter)
 
-    async def stream(self, input: str, scope_hints: dict[str, str] | None = None, context: dict[str, Any] | None = None, tool_filter: list[str] | None = None) -> Any:
+    async def stream(self, input: str, scope_hints: dict[str, str] | None = None, context: dict[str, Any] | None = None, tool_filter: list[str] | None = None) -> AsyncIterator[WeaveEvent]:
         """流式入口：通过事件总线逐 token 产出。
 
         用法:
@@ -391,7 +392,7 @@ class Weave:
     async def emit(self, event_type: str, data: dict[str, Any] | None = None) -> None:
         await self._event_bus.emit(event_type, data)
 
-    def on(self, *event_types: str) -> Any:
+    def on(self, *event_types: str) -> AsyncIterator[WeaveEvent]:
         return self._event_bus.subscribe(*event_types)
 
     # ── Memory 公共 API ───────────────────────────────

@@ -182,7 +182,7 @@ def _validate_raw(raw: dict) -> None:
         if isinstance(sec, dict) and field in sec and sec[field] is not None:
             if sec[field] not in allowed:
                 raise ConfigError(
-                    f"{section}.{field} 期望 {'/'.join(allowed)} 之一，得到 {sec[field]!r}"
+                    f"{section}.{field} expects one of {'/'.join(allowed)}, got {sec[field]!r}"
                 )
 
     for section, fields in int_fields.items():
@@ -194,7 +194,7 @@ def _validate_raw(raw: dict) -> None:
                 try:
                     int(sec[field])
                 except (TypeError, ValueError):
-                    raise ConfigError(f"{section}.{field} 期望整数，得到 {sec[field]!r}")
+                    raise ConfigError(f"{section}.{field} expects an integer, got {sec[field]!r}")
 
     for section, fields in float_fields.items():
         sec = raw.get(section)
@@ -205,7 +205,7 @@ def _validate_raw(raw: dict) -> None:
                 try:
                     float(sec[field])
                 except (TypeError, ValueError):
-                    raise ConfigError(f"{section}.{field} 期望数值，得到 {sec[field]!r}")
+                    raise ConfigError(f"{section}.{field} expects a number, got {sec[field]!r}")
 
 
 def load_config(config_path: str | Path) -> WeaveConfig:

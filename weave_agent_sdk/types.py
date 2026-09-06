@@ -73,7 +73,7 @@ class MemoryEntry:
     namespace: str          # 隔离键 "{scope}:{scope_id}:{access_type}"
     access_type: str        # "stream" | "state" | "knowledge"
     key: str | None         # state 模式下的键
-    content: str            # 实际内容（JSON 序列化后的字符串）
+    content: str            # 存储层表示（JSON 序列化字符串）；用户取值走 state.get / stream.last，不直接消费此字段
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: float = 0.0
     expires_at: float | None = None  # None = 永不过期
