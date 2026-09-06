@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import time
 from abc import ABC, abstractmethod
+from dataclasses import asdict
 from typing import Any
 
 from weave_agent_sdk.llm.base import LLMResponse
@@ -237,6 +238,23 @@ async def persist_stream_entry(agent: Any, entry: dict[str, Any]) -> None:
     await _persist_stream_entry(agent, entry)
 
 
+def _record_llm_trace(agent: Any, messages: list[Any], response: LLMResponse, model: str, t_start: float) -> None:
+    """记录 llm span 到可观测性 trace；agent 未启用 trace 时 no-op（零开销）。"""
+    if not getattr(agent, "__dict__", {}).get("_trace_enabled", False):
+        return
+    agent._trace("llm", {
+        "model": model,
+        "messages": [asdict(m) for m in messages],
+        "response": {
+            "content": response.content,
+            "tool_calls": [asdict(tc) for tc in (response.tool_calls or [])],
+            "usage": response.usage,
+            "finish_reason": response.finish_reason,
+        },
+        "elapsed_ms": int((time.monotonic() - t_start) * 1000),
+    })
+
+
 async def call_llm(agent: Any, messages: list[Any], tools: list[dict[str, Any]] | None = None) -> LLMResponse:
     """调用 LLM；在流式模式下 emit token 事件。
 
@@ -261,6 +279,8 @@ async def call_llm(agent: Any, messages: list[Any], tools: list[dict[str, Any]] 
     streaming = _is_streaming(agent)
     max_tokens = agent._config.llm.max_tokens
     temperature = agent._config.llm.temperature
+    t_start = time.monotonic()
+    model = agent._config.llm.model
 
     if streaming and not tools:
         content_parts: list[str] = []
@@ -274,7 +294,9 @@ async def call_llm(agent: Any, messages: list[Any], tools: list[dict[str, Any]] 
             content_parts.append(token)
             await _emit_event(agent, "token", {"text": token, "index": index})
             index += 1
-        return LLMResponse(content="".join(content_parts))
+        response = LLMResponse(content="".join(content_parts))
+        _record_llm_trace(agent, messages, response, model, t_start)
+        return response
 
     agent.__dict__["_llm_in_flight"] = True
     agent.__dict__["_llm_in_flight_since"] = time.monotonic()
@@ -292,6 +314,7 @@ async def call_llm(agent: Any, messages: list[Any], tools: list[dict[str, Any]] 
     finally:
         agent.__dict__.pop("_llm_in_flight", None)
         agent.__dict__.pop("_llm_in_flight_since", None)
+    _record_llm_trace(agent, messages, response, model, t_start)
     return response
 
 

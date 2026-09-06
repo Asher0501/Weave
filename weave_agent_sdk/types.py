@@ -276,6 +276,17 @@ class CheckpointConfig:
 
 
 @dataclass(slots=True)
+class ObservabilityConfig:
+    """可观测性配置。
+
+    enabled: 是否采集本次 run 的完整链路（trace 树），可通过 weave.last_trace
+        读取。默认 False（零开销，向后兼容）——采集需在 Loop 关键点记录 span，
+        关闭时不产生任何额外工作。
+    """
+    enabled: bool = False
+
+
+@dataclass(slots=True)
 class WeaveConfig:
     """Weave 顶层配置。"""
     agent: AgentConfig = field(default_factory=AgentConfig)
@@ -287,3 +298,4 @@ class WeaveConfig:
     server: ServerConfig = field(default_factory=ServerConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     checkpoint: CheckpointConfig = field(default_factory=CheckpointConfig)
+    observability: ObservabilityConfig = field(default_factory=ObservabilityConfig)

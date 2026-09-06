@@ -111,6 +111,8 @@ class IterativeLoop(BaseLoop):
         iteration = 0
 
         for iteration in range(1, max_iter + 1):
+            # 可观测性：iteration span 开始
+            _trace(agent, "iteration_start", {"iteration": iteration})
             # 裁剪历史消息：保留 system prompt + 当前 user 原始输入 + 最近
             # _MAX_CONTEXT_MESSAGES-2 条，防止长迭代下 messages 线性膨胀（多轮
             # tool 调用时每轮追加 assistant + 多条 tool 消息）。裁剪只影响注入
@@ -171,6 +173,8 @@ class IterativeLoop(BaseLoop):
             if memory_ctx:
                 ctx_text = format_memory_context(memory_ctx)
                 messages[0].content += "\n\n" + ctx_text
+            # 可观测性：memory_inject span（记录注入 prompt 的 memory 原文）
+            _trace(agent, "memory_inject", _serialize_memory_ctx(memory_ctx))
 
             # LLM 调用（流式模式下 emit token 事件）
             tool_schemas = _build_tool_schemas(agent) if agent._tool_map else None
@@ -204,6 +208,7 @@ class IterativeLoop(BaseLoop):
             if _matches_text_pattern(response.content, stop_conditions) or not response.tool_calls:
                 final_output = response.content
                 exhausted = False
+                _trace(agent, "iteration_end", {"stop_reason": "no_tool_calls"})
                 break
 
             # 执行 Tool 调用
@@ -227,7 +232,16 @@ class IterativeLoop(BaseLoop):
                     await _emit_event(agent, "tool_call", {
                         "name": tc.name, "arguments": tc.arguments,
                     })
+                tool_t_start = time.monotonic()
                 tool_result = await _execute_tool(agent, tc)
+                # 可观测性：tool span
+                _trace(agent, "tool", {
+                    "name": tc.name,
+                    "arguments": tc.arguments,
+                    "result": tool_result.result,
+                    "error": tool_result.error,
+                    "elapsed_ms": int((time.monotonic() - tool_t_start) * 1000),
+                })
                 if _is_streaming(agent):
                     await _emit_event(agent, "tool_result", {
                         "name": tc.name,
@@ -259,9 +273,12 @@ class IterativeLoop(BaseLoop):
 
             if finished or final_output:
                 exhausted = False
+                _trace(agent, "iteration_end", {"stop_reason": "finish"})
                 break
 
         t_end = time.perf_counter()
+        if exhausted:
+            _trace(agent, "iteration_end", {"stop_reason": "max_iterations"})
 
         # 汇总 after_think 记录的 stream/state 写入计数（真实写入，非零值存根）
         memory_writes = getattr(agent, "__dict__", {}).get("_memory_writes") or {}
@@ -304,6 +321,32 @@ class IterativeLoop(BaseLoop):
 
 
 # ── Helpers ──────────────────────────────────────────────
+
+def _trace(agent: Any, event_type: str, data: dict[str, Any] | None = None) -> None:
+    """记录可观测性 span；agent 未启用 trace 时 no-op（零开销）。
+
+    经 __dict__ 检查 _trace_enabled 以容错 MagicMock / SimpleNamespace 等
+    测试替身（getattr 会对 MagicMock 自动创建属性）。
+    """
+    if not getattr(agent, "__dict__", {}).get("_trace_enabled", False):
+        return
+    agent._trace(event_type, data)
+
+
+def _serialize_memory_ctx(ctx: dict[str, Any]) -> dict[str, Any]:
+    """把 before_think 返回的 memory context 转成可序列化结构（trace 用）。"""
+    result: dict[str, Any] = {}
+    if ctx.get("stream"):
+        result["stream"] = list(ctx["stream"])
+    if ctx.get("state"):
+        result["state"] = dict(ctx["state"])
+    if ctx.get("knowledge"):
+        result["knowledge"] = [
+            {"id": r.id, "content": r.content, "score": r.score, "metadata": r.metadata}
+            for r in ctx["knowledge"]
+        ]
+    return result
+
 
 def _matches_text_pattern(content: str, stop_conditions: list[dict]) -> bool:
     """检查输出是否命中任一 text_pattern 语义停止条件。

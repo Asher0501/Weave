@@ -8,6 +8,7 @@ import asyncio
 import inspect
 import logging
 import time
+import uuid
 from pathlib import Path, PurePath
 from collections.abc import AsyncIterator
 from typing import Any
@@ -104,6 +105,12 @@ class Weave:
 
         # 并发运行锁：每个事件循环一把，串行化并发调用（防止共享实例状态互相污染）
         self._run_locks: dict[Any, asyncio.Lock] = {}
+
+        # 可观测性：trace 采集状态（observability.enabled 时启用；默认关闭零开销）
+        self._trace_enabled: bool = self._config.observability.enabled
+        self._trace_tree: dict[str, Any] | None = None            # 当前 run 的 trace 树（组装中）
+        self._trace_iteration: dict[str, Any] | None = None  # 当前迭代的 span dict
+        self._last_trace: dict[str, Any] | None = None       # 最近一次完成的 trace 树
 
     # ── 公共 API ──────────────────────────────────────
 
@@ -401,6 +408,83 @@ class Weave:
     def memory(self) -> MemoryManager:
         return self._memory
 
+    # ── 可观测性 ──────────────────────────────────────
+
+    @property
+    def last_trace(self) -> dict[str, Any] | None:
+        """最近一次 run 的完整 trace 树（observability.enabled 时才非 None）。
+
+        结构：
+            {
+              "run_id": str, "input": str, "scope_hints": dict, "context": dict,
+              "started_at": float, "finished_at": float, "elapsed_ms": int,
+              "output": str, "iterations": int,
+              "iterations_detail": [
+                {"iteration": int,
+                 "memory_inject": {"stream": [...], "state": {...}, "knowledge": [...]},
+                 "llm": {"model": str, "messages": [...], "response": {...},
+                          "elapsed_ms": int, "retries": int},
+                 "tools": [{"name": str, "arguments": dict, "result": Any,
+                             "error": str | None, "elapsed_ms": int}],
+                 "stop_reason": str},
+                ...
+              ],
+            }
+
+        注意：这是新增的只读入口，不改动 run()/arun() 的 LoopResult 结构。
+        """
+        return self._last_trace
+
+    def _trace(self, event_type: str, data: dict[str, Any] | None = None) -> None:
+        """内部：记录可观测性 span。Loop 在关键点调用；关闭时 no-op（零开销）。
+
+        event_type: run_start / iteration_start / memory_inject / llm / tool /
+            iteration_end / run_end。Loop 只上报事件，不感知 trace 后端
+            （符合「下层不感知上层」的设计哲学）。
+        """
+        if not getattr(self, "_trace_enabled", False):
+            return
+        data = data or {}
+        if event_type == "run_start":
+            self._trace_tree = {
+                "run_id": str(uuid.uuid4()),
+                "input": data.get("input", ""),
+                "scope_hints": data.get("scope_hints"),
+                "context": data.get("context"),
+                "started_at": time.time(),
+                "iterations_detail": [],
+            }
+            self._trace_iteration = None
+        elif event_type == "iteration_start":
+            self._trace_iteration = {"iteration": data.get("iteration", 0), "tools": []}
+            if getattr(self, "_trace_tree", None) is not None:
+                self._trace_tree["iterations_detail"].append(self._trace_iteration)
+        elif event_type == "memory_inject":
+            if self._trace_iteration is not None:
+                self._trace_iteration["memory_inject"] = data
+        elif event_type == "llm":
+            if self._trace_iteration is not None:
+                self._trace_iteration["llm"] = data
+        elif event_type == "tool":
+            if self._trace_iteration is not None:
+                self._trace_iteration["tools"].append(data)
+        elif event_type == "iteration_end":
+            if self._trace_iteration is not None:
+                self._trace_iteration["stop_reason"] = data.get("stop_reason")
+        elif event_type == "run_end":
+            if getattr(self, "_trace_tree", None) is not None:
+                self._trace_tree.update({
+                    "output": data.get("output", ""),
+                    "iterations": data.get("iterations", 0),
+                    "finished_at": time.time(),
+                })
+                self._trace_tree["elapsed_ms"] = int(
+                    (self._trace_tree["finished_at"] - self._trace_tree["started_at"]) * 1000
+                )
+                self._last_trace = self._trace_tree
+                self._trace_tree = None
+                self._trace_iteration = None
+
     # ── 内部实现 ──────────────────────────────────────
 
     async def _run_impl(self, input: str, scope_hints: dict[str, str] | None = None, context: dict[str, Any] | None = None, tool_filter: list[str] | None = None, _streaming: bool = False) -> LoopResult:
@@ -496,6 +580,8 @@ class Weave:
         self._streaming = _streaming
         # 清空上次运行的 memory 写入计数（由 after_think 钩子记录）
         self.__dict__.pop("_memory_writes", None)
+        # 可观测性：run span 开始（关闭时 no-op）
+        self._trace("run_start", {"input": input, "scope_hints": scope_hints, "context": context})
 
         try:
             # 0. 非功能：prompt 注入防御（默认关闭；features.prompt_defense: true 时生效）
@@ -523,12 +609,17 @@ class Weave:
                     self._tools = original_tools
                     self._tool_map = original_tool_map
 
+            # 可观测性：run span 结束（正常路径）
+            self._trace("run_end", {"output": result.output, "iterations": result.iterations})
             return result
         finally:
             # 无论成功或失败，都复位运行状态，避免 status() 永久报告 running
             self._is_running = False
             self._last_run = time.time()
             self._streaming = False
+            # 可观测性：异常路径兜底（run_start 了但未 run_end）
+            if getattr(self, "_trace_tree", None) is not None:
+                self._trace("run_end", {"output": "", "iterations": 0})
 
     def _create_loop(self) -> BaseLoop:
         """根据配置创建对应的 Loop 实例。

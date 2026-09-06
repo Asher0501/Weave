@@ -17520,3 +17520,80 @@ class TestRound20BackendNoPathChromaE2E:
         manager.cleanup()
         stats = manager.stats()
         assert stats.get("session:s1:state") == 1
+
+
+class TestObservability:
+    """阶段1：可观测性 weave.last_trace。"""
+
+    def test_last_trace_records_run_chain(self):
+        """observability.enabled 时，last_trace 记录 run → iteration → llm/tool 链路。"""
+        from weave_agent_sdk import Weave, WeaveConfig
+        from weave_agent_sdk.types import ObservabilityConfig, LoopConfig, LLMConfig, ToolCall
+        from weave_agent_sdk.llm.base import BaseLLM, LLMResponse
+
+        class _ToolCallingLLM(BaseLLM):
+            def __init__(self):
+                self.n = 0
+
+            async def chat(self, messages, tools=None, max_tokens=4096, temperature=0.7):
+                self.n += 1
+                if self.n == 1:
+                    return LLMResponse(
+                        content="",
+                        tool_calls=[ToolCall(id="1", name="add", arguments={"a": 1, "b": 2})],
+                        finish_reason="tool_calls",
+                    )
+                return LLMResponse(content="done", finish_reason="stop")
+
+            async def chat_stream(self, messages, tools=None, max_tokens=4096, temperature=0.7):
+                if False:
+                    yield
+                yield "x"
+
+        cfg = WeaveConfig(
+            llm=LLMConfig(provider="anthropic", model="fake"),
+            loop=LoopConfig(type="iterative", max_iterations=5),
+            observability=ObservabilityConfig(enabled=True),
+        )
+        weave = Weave(config=cfg, llm=_ToolCallingLLM())
+
+        @weave.tool
+        def add(a: int, b: int) -> int:
+            return a + b
+
+        result = weave.run("1+2")
+        assert result.output == "done"
+
+        trace = weave.last_trace
+        assert trace is not None
+        assert trace["input"] == "1+2"
+        assert trace["iterations"] == 2
+        assert trace["output"] == "done"
+        assert "elapsed_ms" in trace
+
+        its = trace["iterations_detail"]
+        assert len(its) == 2
+        assert its[0]["iteration"] == 1
+        assert its[0]["tools"][0]["name"] == "add"
+        assert its[0]["tools"][0]["result"] == 3
+        assert its[0]["llm"]["model"] == "fake"
+        assert its[1]["stop_reason"] == "no_tool_calls"
+
+    def test_last_trace_none_when_disabled(self):
+        """observability 默认关闭时，last_trace 为 None。"""
+        from weave_agent_sdk import Weave, WeaveConfig
+        from weave_agent_sdk.llm.base import BaseLLM, LLMResponse
+
+        class _FakeLLM(BaseLLM):
+            async def chat(self, messages, tools=None, **k):
+                return LLMResponse(content="ok")
+
+            async def chat_stream(self, messages, tools=None, **k):
+                if False:
+                    yield
+                yield "ok"
+
+        weave = Weave(config=WeaveConfig(), llm=_FakeLLM())
+        result = weave.run("hi")
+        assert result.output == "ok"
+        assert weave.last_trace is None

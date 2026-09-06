@@ -24,6 +24,7 @@
 | `on()` | `(*event_types: str) -> AsyncIterator[WeaveEvent]` | 订阅事件（async generator，`async for` 消费） |
 | `emit()` | `async (event_type: str, data: dict \| None = None) -> None` | 发布事件（需 `await`） |
 | `memory` | `-> MemoryManager` | Memory 公共访问入口 |
+| `last_trace` | `-> dict \| None` | 最近一次 run 的完整 trace 树（`observability.enabled` 时才非 None） |
 | `status()` | `() -> dict` | 返回 Agent 状态 |
 | `checkpoint()` | `() -> str` | 手动打状态快照，返回 checkpoint_id |
 | `checkpoints()` | `() -> list[dict]` | 列出当前 session 的所有快照 |

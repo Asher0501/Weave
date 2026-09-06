@@ -24,6 +24,7 @@ from weave_agent_sdk.types import (
     LoopConfig,
     MemoryConfig,
     MemoryScopeConfig,
+    ObservabilityConfig,
     PromptConfig,
     ServerConfig,
     WeaveConfig,
@@ -269,6 +270,7 @@ def load_config(config_path: str | Path) -> WeaveConfig:
     server_raw = raw.get("server", {}) or {}
     logging_raw = raw.get("logging", {}) or {}
     checkpoint_raw = raw.get("checkpoint", {}) or {}
+    observability_raw = raw.get("observability", {}) or {}
 
     # stream_timeout 为可选"空闲超时"（秒）：未配置（None）表示不启用；
     # 非数值 / 非法配置降级为 None，避免 asyncio.wait_for 收到非法 timeout。
@@ -356,5 +358,8 @@ def load_config(config_path: str | Path) -> WeaveConfig:
             enabled=bool(checkpoint_raw.get("enabled", False)),
             trigger=str(checkpoint_raw.get("trigger", "after_each_tool")),
             keep=int(checkpoint_raw.get("keep", 10)),
+        ),
+        observability=ObservabilityConfig(
+            enabled=bool(observability_raw.get("enabled", False)),
         ),
     )
