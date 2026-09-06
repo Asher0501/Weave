@@ -173,7 +173,7 @@ class IterativeLoop(BaseLoop):
                 messages[0].content += "\n\n" + ctx_text
 
             # LLM 调用（流式模式下 emit token 事件）
-            tool_schemas = _build_tool_schemas(agent) if agent._tools else None
+            tool_schemas = _build_tool_schemas(agent) if agent._tool_map else None
             response = await call_llm(agent, messages, tool_schemas)
 
             # 延迟提交 user 消息（仅首次成功获得 assistant 回复时落盘一次）：
@@ -323,10 +323,32 @@ def _matches_text_pattern(content: str, stop_conditions: list[dict]) -> bool:
 
 
 def _build_tool_schemas(agent: Any) -> list[dict[str, Any]]:
-    """构建 Tool JSON Schema 列表。"""
+    """构建 Tool JSON Schema 列表。
+
+    工具名 / 描述 / schema 优先取显式注册值（_tool_meta），未显式指定时
+    回退 fn.__name__ / fn.__doc__ / 类型注解自动推断。遍历 _tool_map（name
+    → fn）而非 _tools，使显式 name 覆盖正确反映到 schema 的 name 字段。
+    """
     schemas = []
-    for tool in agent._tools:
-        sig = inspect.signature(tool)
+    # 经 __dict__ 读取以容错 MagicMock / SimpleNamespace 等测试替身：
+    # getattr(agent, "_tool_meta", {}) 对 MagicMock 会返回自动创建的 MagicMock
+    # （truthy），而非默认空 dict。这里确保拿到的要么是真实 dict 要么是空。
+    tool_meta = getattr(agent, "__dict__", {}).get("_tool_meta", {}) or {}
+    for tool_name, fn in agent._tool_map.items():
+        meta = tool_meta.get(tool_name, {})
+        # 显式传入完整 schema 时直接使用（仅确保 name 正确），跳过自动推断
+        explicit_schema = meta.get("schema")
+        if explicit_schema is not None:
+            s = dict(explicit_schema)
+            s.setdefault("name", tool_name)
+            schemas.append(s)
+            continue
+        # description 显式指定则用，否则回退 docstring
+        description = meta.get("description")
+        if description is None:
+            description = (fn.__doc__ or "").strip()
+        # 自动推断 parameters
+        sig = inspect.signature(fn)
         params: dict[str, Any] = {"type": "object", "properties": {}, "required": []}
         for name, param in sig.parameters.items():
             if name in ("self", "cls"):
@@ -338,8 +360,8 @@ def _build_tool_schemas(agent: Any) -> list[dict[str, Any]]:
         if not params["required"]:
             del params["required"]
         schemas.append({
-            "name": tool.__name__,
-            "description": (tool.__doc__ or "").strip(),
+            "name": tool_name,
+            "description": description,
             "parameters": params,
         })
     return schemas

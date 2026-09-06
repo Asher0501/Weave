@@ -88,6 +88,30 @@ class TestToolRegistration:
         assert len(self.weave._tools) == 1
         assert len(self.weave._tool_map) == 1
 
+    def test_tool_decorator_supports_name_description_schema(self):
+        """@weave.tool 支持 name / description / schema 显式覆盖自动推断。"""
+
+        @self.weave.tool(name="search_kb", description="搜索知识库")
+        def _search(q: str) -> str:
+            return q
+
+        @self.weave.tool(
+            name="custom",
+            schema={
+                "name": "custom",
+                "description": "自定义 schema",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        )
+        def _custom() -> None:
+            return None
+
+        assert self.weave._tool_map["search_kb"] is _search
+        assert self.weave._tool_map["custom"] is _custom
+        assert self.weave._tool_meta["search_kb"]["description"] == "搜索知识库"
+        assert self.weave._tool_meta["search_kb"]["schema"] is None
+        assert self.weave._tool_meta["custom"]["schema"] is not None
+
     def test_register_tool_registers_function(self):
         """register_tool() 应正确注册函数到 _tools 和 _tool_map。"""
 
@@ -133,8 +157,8 @@ class TestToolRegistration:
         self.weave.register_tool(fn_d)
 
         assert spy.call_count == 2
-        spy.assert_any_call(fn_c)
-        spy.assert_any_call(fn_d)
+        spy.assert_any_call(fn_c, name=None, description=None, schema=None)
+        spy.assert_any_call(fn_d, name=None, description=None, schema=None)
 
     def test_tool_decorator_returns_function_unchanged(self):
         """tool() 装饰器应返回原函数（而非 None 或包装器）。"""
@@ -12047,6 +12071,7 @@ class TestRound6ToolTypeInferenceUnit:
 
         agent = MagicMock()
         agent._tools = [search]
+        agent._tool_map = {t.__name__: t for t in agent._tools}
 
         schemas = _build_tool_schemas(agent)
         assert len(schemas) == 1
@@ -12251,6 +12276,7 @@ class TestRound6ToolSchemaE2E:
 
         agent = MagicMock()
         agent._tools = [analyze]
+        agent._tool_map = {t.__name__: t for t in agent._tools}
 
         schemas = _build_tool_schemas(agent)
         assert len(schemas) == 1
@@ -13446,6 +13472,7 @@ class TestRound11ToolTypeRecheckUnit:
 
         agent = MagicMock()
         agent._tools = [analyze]
+        agent._tool_map = {t.__name__: t for t in agent._tools}
 
         schemas = _build_tool_schemas(agent)
         schema = schemas[0]
@@ -13688,6 +13715,7 @@ class TestRound11ToolTypeRecheckE2E:
 
         agent = MagicMock()
         agent._tools = [search_kb]
+        agent._tool_map = {t.__name__: t for t in agent._tools}
 
         schemas = _build_tool_schemas(agent)
         schema = schemas[0]
@@ -14081,6 +14109,7 @@ class TestRound12ToolTypeInferenceUnit:
 
         agent = MagicMock()
         agent._tools = [no_args, opt_no_default, with_default]
+        agent._tool_map = {t.__name__: t for t in agent._tools}
 
         schemas = {s["name"]: s for s in _build_tool_schemas(agent)}
 
@@ -14110,6 +14139,7 @@ class TestRound12ToolTypeInferenceE2E:
 
         agent = MagicMock()
         agent._tools = [analyze]
+        agent._tool_map = {t.__name__: t for t in agent._tools}
 
         schemas = _build_tool_schemas(agent)
         schema = schemas[0]

@@ -84,6 +84,9 @@ class Weave:
         # Tool 注册
         self._tools: list[Any] = []
         self._tool_map: dict[str, Any] = {}
+        # 工具元信息：name → {"description": str|None, "schema": dict|None}
+        # None 表示未显式指定，回退自动推断（fn.__doc__ / 类型注解）
+        self._tool_meta: dict[str, dict[str, Any]] = {}
 
         # Loop 策略
         self._loop: BaseLoop = loop if loop is not None else self._create_loop()
@@ -318,19 +321,70 @@ class Weave:
 
     # ── Tool 注册 ─────────────────────────────────────
 
-    def _register_tool_internal(self, fn: Any) -> None:
-        """内部方法：注册 tool 到 _tools 和 _tool_map。"""
-        self._tools.append(fn)
-        self._tool_map[fn.__name__] = fn
+    def _register_tool_internal(
+        self,
+        fn: Any,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        schema: dict[str, Any] | None = None,
+    ) -> None:
+        """内部方法：注册 tool 到 _tools / _tool_map / _tool_meta。
 
-    def tool(self, fn: Any) -> Any:
-        """装饰器：注册 tool 函数。"""
-        self._register_tool_internal(fn)
+        name / description / schema 为可选显式覆盖：未提供时回退
+        fn.__name__ / fn.__doc__ / 类型注解自动推断。
+        """
+        tool_name = name or fn.__name__
+        self._tools.append(fn)
+        self._tool_map[tool_name] = fn
+        # 容错：Weave.__new__ 构造（绕过 __init__）时 _tool_meta 可能未初始化
+        meta = self.__dict__.setdefault("_tool_meta", {})
+        meta[tool_name] = {
+            "description": description,
+            "schema": schema,
+        }
+
+    def tool(
+        self,
+        fn: Any = None,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        schema: dict[str, Any] | None = None,
+    ) -> Any:
+        """装饰器：注册 tool 函数。
+
+        支持两种用法：
+            @weave.tool
+            def f(...): ...
+
+            @weave.tool(name="search_kb", description="搜索知识库")
+            def _search(q: str) -> str: ...
+        """
+        if fn is None:
+            def decorator(f: Any) -> Any:
+                self._register_tool_internal(
+                    f, name=name, description=description, schema=schema
+                )
+                return f
+            return decorator
+        self._register_tool_internal(
+            fn, name=name, description=description, schema=schema
+        )
         return fn
 
-    def register_tool(self, fn: Any) -> None:
-        """直接注册 tool 函数。"""
-        self._register_tool_internal(fn)
+    def register_tool(
+        self,
+        fn: Any,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        schema: dict[str, Any] | None = None,
+    ) -> None:
+        """直接注册 tool 函数（等价 @weave.tool，供无装饰器场景）。"""
+        self._register_tool_internal(
+            fn, name=name, description=description, schema=schema
+        )
 
     # ── 事件总线 ──────────────────────────────────────
 
@@ -454,12 +508,12 @@ class Weave:
             # 2. 加载 System Prompt
             self._system_prompt = self._load_system_prompt(context)
 
-            # 3. 如果有 tool_filter，临时过滤 tools
+            # 3. 如果有 tool_filter，临时过滤 tools（按工具 name，含显式 name 覆盖）
             if tool_filter:
                 original_tools = self._tools
                 original_tool_map = self._tool_map
-                self._tools = [t for t in self._tools if t.__name__ in tool_filter]
                 self._tool_map = {k: v for k, v in self._tool_map.items() if k in tool_filter}
+                self._tools = [t for t in self._tools if t in self._tool_map.values()]
 
             try:
                 result = await self._loop.run(self, input)
