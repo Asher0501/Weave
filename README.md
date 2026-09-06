@@ -36,8 +36,11 @@
 ### 安装
 
 ```bash
-pip install -e .            # 核心（仅依赖 PyYAML）
-pip install -e ".[all]"     # 含 anthropic / openai / chromadb / fastapi
+pip install weave-agent-sdk           # 核心（仅依赖 PyYAML）
+pip install "weave-agent-sdk[all]"    # 含 anthropic / openai / chromadb / fastapi
+
+# 本地开发（从仓库源码，editable）
+pip install -e .
 ```
 
 ### 脚手架（最快起步）
@@ -57,15 +60,23 @@ python agent.py              # 直接跑
 ```python
 from weave_agent_sdk import Weave
 
-weave = Weave("weave.yaml")          # 1. 加载配置
+weave = Weave()                      # 1. 零配置构造（凭证从环境变量读取）
 
-@weave.tool                          # 2. 注册你的工具
+@weave.tool(name="search", description="搜索")  # 2. 注册工具（显式命名 + 描述）
 def search(query: str) -> str:
     return f"搜索结果：{query}"
 
 result = weave.run("我应该学什么？")   # 3. 跑起来
 print(result.output)
 ```
+
+> 三种构造方式等价：`Weave()` 零配置 / `Weave("weave.yaml")` 读文件 /
+> `Weave(config=WeaveConfig(...))` 程序化。Memory 读写是**同步**的（无需 `await`）：
+>
+> ```python
+> weave.memory.state.set("topic", "推荐系统", ns)   # 同步写
+> value = weave.memory.state.get("topic", ns)        # 同步读
+> ```
 
 ### 配置 `weave.yaml`
 
@@ -88,7 +99,8 @@ prompts:
   system: prompts/system.md            # prompt 从文件加载，模板变量注入
 ```
 
-> 所有凭证从环境变量读取，代码与配置中**零硬编码**（API Key / Prompt / 模型名）。
+> 所有凭证从**标准环境变量**读取（`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
+> `DEEPSEEK_API_KEY` 等），代码与配置中**零硬编码**（API Key / Prompt / 模型名）。
 
 ---
 
@@ -177,9 +189,10 @@ flowchart TB
 
 | 类别 | 能力 |
 |------|------|
-| **入口** | 同步 `run()` · 异步 `arun()` · 流式 `stream()`，签名统一 |
+| **入口** | 三种构造（零配置 / yaml / 程序化）· 同步 `run()` · 异步 `arun()` · 流式 `stream()` |
 | **Loop** | `simple` / `iterative` / `scheduled`（cron + 事件驱动） |
-| **Memory** | `stream` / `state` / `knowledge`，TTL 过期，namespace 隔离 |
+| **Memory** | `stream` / `state` / `knowledge`，**同步读写**，TTL 过期，namespace 隔离 |
+| **Tool** | `@weave.tool` 支持显式 `name` / `description` / `schema` |
 | **LLM** | anthropic / openai / deepseek，流式与非流式 |
 | **存储后端** | sqlite（默认，WAL）/ file / chroma（向量语义搜索） |
 | **Prompt** | `.md` 模板 + `.schema.yaml` 声明式组装，变量 `{{ }}` 注入 |
@@ -260,7 +273,7 @@ python main.py --real    # 真实模型
 | [`docs/public-api.md`](docs/public-api.md) | 稳定公开 API 清单 |
 | [`docs/internal-utilities.md`](docs/internal-utilities.md) | 内部非功能工具（排查用） |
 | [`DESIGN.md`](DESIGN.md) | 完整设计文档 |
-| [`docs/issues/`](docs/issues/) | 设计决策记录（001–011） |
+| [`docs/issues/`](docs/issues/) | 设计决策记录（001–012） |
 
 ---
 
