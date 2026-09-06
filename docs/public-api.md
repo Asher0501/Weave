@@ -117,6 +117,20 @@ async for event in weave.on("token", "done"):
 await weave.emit("data_change", {"reason": "manual"})
 ```
 
+### 1.8 超时配置速查（`loop.*`）
+
+五个超时语义不同，勿混用：
+
+| 配置项 | 默认 | 语义 |
+|------|------|------|
+| `loop.timeout` | 5.0s | `stream()` 收到 `done`/`error` 后等后台任务收尾的宽限时长（**非**整次运行期限） |
+| `loop.stream_timeout` | None | `stream()`/WS 空闲超时（自上次事件计时，事件到达即重置；None=不启用） |
+| `loop.tool_timeout` | 30.0s | 单个工具执行的硬超时 |
+| `loop.llm_timeout` | 120.0s | 在途非流式 LLM 调用被视为「活动」的最长时长（超此视为挂起，允许空闲超时取消） |
+| `loop.llm_call_timeout` | 120.0s | 单次非流式 LLM 调用的硬超时（覆盖整个重试序列） |
+
+另见 `loop.llm_retry_attempts`（重试次数，默认 3）、`loop.llm_retry_backoff`（退避倍率，默认 2.0）。
+
 ---
 
 ## 2. 扩展点（需实现特定接口，签名稳定）

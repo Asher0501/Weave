@@ -64,7 +64,7 @@ class StateMemory(ABC):
 
 
 class KnowledgeMemory(ABC):
-    """知识搜索 — 追加写入，不覆盖，语义/全文搜索。"""
+    """知识搜索 — 追加写入，不覆盖，全文/语义搜索（后端决定：sqlite 关键词、chroma 语义）。"""
 
     @abstractmethod
     def add(self, content: str, namespace: str, metadata: dict[str, Any] | None = None) -> str:
@@ -73,7 +73,7 @@ class KnowledgeMemory(ABC):
 
     @abstractmethod
     def search(self, query: str, namespaces: list[str] | None = None, top_k: int = 5) -> list[SearchResult]:
-        """全文/语义搜索相关知识。
+        """搜索相关知识（sqlite 后端为关键词搜索，chroma 后端为语义向量搜索）。
 
         Args:
             query: 搜索查询

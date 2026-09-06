@@ -99,6 +99,10 @@ prompts:
   system: prompts/system.md            # prompt 从文件加载，模板变量注入
 ```
 
+> prompt 路径解析规则：`prompts/system.md`（带 `prompts/` 前缀）相对配置目录；
+> 裸名 `system` 走 registry 命名 prompt（同为 `prompts/system.md`）；`./system.md` 或
+> 绝对路径按文件直载。
+
 > 所有凭证从**标准环境变量**读取（`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
 > `DEEPSEEK_API_KEY` 等），代码与配置中**零硬编码**（API Key / Prompt / 模型名）。
 
@@ -120,7 +124,7 @@ prompts:
 |------|------|------|
 | `stream` | `append` / `last(N)` / `trim` | 对话历史，时序流 |
 | `state` | `set` / `get` / `delete` / `get_all` | 键值状态，新值覆盖旧值 |
-| `knowledge` | `add` / `search(query, top_k)` | 知识库，追加不覆盖，语义搜索 |
+| `knowledge` | `add` / `search(query, top_k)` | 知识库，追加不覆盖，关键词搜索（chroma 后端为语义） |
 
 ### Namespace 隔离
 

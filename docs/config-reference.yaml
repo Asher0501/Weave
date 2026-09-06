@@ -11,7 +11,7 @@ llm:
   max_tokens: ${WEAVE_MAX_TOKENS:-4096}
   temperature: ${WEAVE_TEMP:-0.7}
   # api_key 绝不在此硬编码，从环境变量 ANTHROPIC_API_KEY / OPENAI_API_KEY /
-  # DEEPSEEK_API_KEY 或 ~/.claude/settings.json 读取
+  # DEEPSEEK_API_KEY 读取
   base_url: ""                   # 自定义 API 地址；deepseek 默认 https://api.deepseek.com/v1
 
 loop:
@@ -29,13 +29,16 @@ loop:
                                  # stream_timeout 是空闲超时，不是"整次运行总时长上限"。
   tool_timeout: 30.0             # 单个 tool 执行超时（秒）
   llm_timeout: 120.0             # "在途"非流式 LLM 调用被视为"活动"的最长时长（秒）
+  llm_call_timeout: 120.0        # 单次非流式 LLM 调用的硬超时（含重试序列，秒）
+  llm_retry_attempts: 3          # 非流式 LLM 调用重试次数（1=不重试）
+  llm_retry_backoff: 2.0         # 重试退避倍率
   memory_context_limit: 20       # before_think 注入 system prompt 的 stream 历史条数上限
   memory_knowledge_topk: 5       # before_think 知识检索注入条数上限（knowledge search 的 top_k）
   messages_window: 20            # iterative LLM 消息窗口条数上限（超过则裁剪最旧对话；最小值 3）
   event_min_interval: 1.0        # 事件驱动 scheduled 最小触发间隔（秒）
 
 memory:
-  # 三种访问模式：stream（对话历史）/ state（键值状态）/ knowledge（知识库，语义搜索）。
+  # 三种访问模式：stream（对话历史）/ state（键值状态）/ knowledge（知识库，关键词搜索；chroma 后端为语义向量搜索）。
   # 作用域（scope）由项目自定义，隔离键 namespace 格式 {scope_name}:{scope_id}:{access_type}。
   # scope_id 来自运行时 scope_hints（key 约定 {scope_name}_id）。
   # 不写 memory: 段时，自动用默认 scope + SQLite + ./data/memory.db。
@@ -59,6 +62,10 @@ prompts:
   system: prompts/system.md      # 未配置时用内置默认 prompt
   loop_instruction: prompts/loop.md
   memory_use: prompts/memory.md
+  # 路径解析规则：
+  #   prompts/system.md      → 相对配置目录的 prompts/system.md
+  #   system（裸名）          → registry 命名 prompt，同为 prompts/system.md
+  #   ./system.md 或绝对路径  → 按文件直载（相对配置目录 / 绝对路径）
 
 features:
   schema_validation: false

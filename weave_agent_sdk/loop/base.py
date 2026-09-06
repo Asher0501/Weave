@@ -280,9 +280,10 @@ async def call_llm(agent: Any, messages: list[Any], tools: list[dict[str, Any]] 
     agent.__dict__["_llm_in_flight_since"] = time.monotonic()
     try:
         response = await _chat_with_retry(agent, messages, tools, max_tokens, temperature)
-        if streaming:
+        if streaming and response.content:
             # 有 tools 时无法安全使用 chat_stream（会丢失 tool_calls），
             # 以单条 token 事件输出完整文本，保证事件契约可用。
+            # 工具调用轮 response.content 为空时不 emit，避免空 token 噪声。
             # 在 finally 清除在途标记之前 emit：消费端空闲超时（stream()/WS）
             # 以"在途标记"判定是否继续等待，若先清除再 emit，会留下
             # "无在途标记且 token 尚未入队"的竞态窗口——该窗口内消费端超时

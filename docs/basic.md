@@ -67,7 +67,7 @@ Adapter Layer      →  LLM Adapters / Store Adapters / Prompt Loader  (可插�
 |------|------|------|
 | `stream` | append / last(N) / trim | 对话历史，时序流 |
 | `state` | set / get / delete / get_all | 键值状态，新值覆盖旧值 |
-| `knowledge` | add / search(query, top_k) | 知识库，追加不覆盖，语义搜索 |
+| `knowledge` | add / search(query, top_k) | 知识库，追加不覆盖，关键词搜索（chroma 后端为语义） |
 
 **关键约束**：
 - **时间维度 = TTL**，不是独立的 Memory 类型。每条记忆可配过期时间

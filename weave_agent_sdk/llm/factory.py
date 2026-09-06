@@ -9,12 +9,15 @@
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
 from weave_agent_sdk.llm.base import BaseLLM
 from weave_agent_sdk.registry import Registry
 from weave_agent_sdk.types import DEFAULT_PROVIDER
+
+logger = logging.getLogger(__name__)
 
 
 # ── LLM 注册表 ──────────────────────────────────────────
@@ -101,9 +104,43 @@ def create_llm(
             f"Set model in weave.yaml or WEAVE_MODEL environment variable."
         )
 
+    # ── 3.5 provider / model 配对提示（非阻断，仅 warning）──
+    _warn_provider_model_mismatch(provider, model, base_url)
+
     # ── 4. 创建实例（经注册表，内置 provider = 预注册默认值）──
     return LLM_REGISTRY.create(
         provider, api_key=api_key, model=model, base_url=base_url, auth_token=auth_token
+    )
+
+
+# provider → 模型名前缀（用于"配对提示"，非强制校验）
+_PROVIDER_MODEL_PREFIXES: dict[str, tuple[str, ...]] = {
+    "anthropic": ("claude-",),
+    "openai": ("gpt-", "o1", "o3", "o4", "chatgpt-"),
+    "deepseek": ("deepseek-",),
+}
+
+
+def _warn_provider_model_mismatch(
+    provider: str, model: str | None, base_url: str | None
+) -> None:
+    """已知 provider + 未自定义 base_url 时，模型名明显不匹配则告警。
+
+    非阻断（仅 warning）：自定义 base_url 的代理/网关模型名自由，跳过校验；
+    即使误报也只提示，不阻断创建。帮助用户早发现 provider/model 配错。
+    """
+    if base_url:
+        return
+    prefixes = _PROVIDER_MODEL_PREFIXES.get(provider)
+    if not prefixes:
+        return
+    m = (model or "").lower()
+    if m.startswith(prefixes):
+        return
+    logger.warning(
+        "provider '%s' 与 model '%s' 看起来不匹配（%s 模型通常以 %s 开头）。"
+        "若非代理/网关，请检查 llm.provider / llm.model 是否配错。",
+        provider, model, provider, "/".join(prefixes),
     )
 
 
