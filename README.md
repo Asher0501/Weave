@@ -158,7 +158,7 @@ result_b = weave.run("问题", scope_hints={"session_id": "B", "persona_id": "P2
 ```mermaid
 flowchart TB
     subgraph Integration["Integration Layer · 对外，不可变"]
-        SDK["Python SDK<br/>run() / arun() / stream()"]
+        SDK["Python SDK<br/>run() / arun() / stream() / last_trace"]
         REST["REST Server<br/>FastAPI + WebSocket"]
     end
 
@@ -167,6 +167,7 @@ flowchart TB
         Loop["Loop Engine<br/>simple / iterative / scheduled"]
         Memory["Memory Manager<br/>stream / state / knowledge"]
         Tools["Tool Registry"]
+        Trace["Trace 采集<br/>span → last_trace"]
     end
 
     subgraph Adapter["Adapter Layer · 可插拔"]
@@ -183,9 +184,13 @@ flowchart TB
     Loop --> LLM
     Memory --> Store
     Agent --> Prompt
+    Loop -.span.-> Trace
+    Memory -.span.-> Trace
 ```
 
 **规则**：上层依赖下层，下层不感知上层；Adapter 可平行扩展，Core 接口不变。
+虚线 `-.span.->` 表示 span 上报（可观测，非依赖）——Loop/Memory 只上报结构化事件，
+不感知 Trace 采集。
 
 ---
 
@@ -201,7 +206,44 @@ flowchart TB
 | **存储后端** | sqlite（默认，WAL）/ file / chroma（向量语义搜索） |
 | **Prompt** | `.md` 模板 + `.schema.yaml` 声明式组装，变量 `{{ }}` 注入 |
 | **Server** | FastAPI REST + WebSocket 流式，与 SDK 同抽象 |
+| **可观测** | `weave.last_trace` 完整 run 链路（iteration / llm / tool / memory 注入），默认关闭零开销 |
 | **非功能** | LLM 调用重试 / 硬超时 / Prompt 注入防御（内置接线，默认生效） |
+
+---
+
+## 可观测性
+
+开启 `observability.enabled` 后，`weave.last_trace` 返回本次 run 的完整链路——每轮迭代
+注入了哪段 memory、发给 LLM 的 messages、LLM 返回了什么（含 token 用量）、每个工具的
+执行结果，以及停止原因。
+
+```python
+from weave_agent_sdk import Weave, WeaveConfig
+from weave_agent_sdk.types import ObservabilityConfig
+
+weave = Weave(config=WeaveConfig(observability=ObservabilityConfig(enabled=True)), llm=...)
+
+result = weave.run("问题")
+trace = weave.last_trace
+# trace["iterations_detail"] = [
+#     {"iteration": 1,
+#      "memory_inject": {"stream": [...], "state": {...}, "knowledge": [...]},
+#      "llm": {"model": "...", "messages": [...], "response": {...}, "elapsed_ms": int},
+#      "tools": [{"name": "...", "arguments": {...}, "result": ..., "error": ..., "elapsed_ms": int}],
+#      "stop_reason": "no_tool_calls"},
+#     ...
+# ]
+```
+
+或经 `weave.yaml`：
+
+```yaml
+observability:
+  enabled: true
+```
+
+> `last_trace` 是**通用数据**（业务无关 dict），weave 只负责采集、不绑定消费方式。
+> 是否落盘 / 接外部看板（Langfuse 等）是宿主自己的事——weave 不内置任何特定厂商适配器。
 
 ---
 
