@@ -22,6 +22,7 @@ from weave_agent_sdk.loop.base import (
     _emit_event,
     _is_streaming,
     _maybe_checkpoint,
+    _trace_enabled,
 )
 from weave_agent_sdk.types import LoopResult, Message, ToolCall, ToolResult as ToolResultType
 
@@ -328,7 +329,7 @@ def _trace(agent: Any, event_type: str, data: dict[str, Any] | None = None) -> N
     经 __dict__ 检查 _trace_enabled 以容错 MagicMock / SimpleNamespace 等
     测试替身（getattr 会对 MagicMock 自动创建属性）。
     """
-    if not getattr(agent, "__dict__", {}).get("_trace_enabled", False):
+    if not _trace_enabled(agent):
         return
     agent._trace(event_type, data)
 

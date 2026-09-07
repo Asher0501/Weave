@@ -238,15 +238,45 @@ async def persist_stream_entry(agent: Any, entry: dict[str, Any]) -> None:
     await _persist_stream_entry(agent, entry)
 
 
+# trace 中字符串字段的最大长度（控制 last_trace 体积，防长历史撑爆）
+_TRACE_MAX_STR = 5000
+
+
+def _trace_enabled(agent: Any) -> bool:
+    """检查 agent 是否启用了可观测性 trace（动态读 config，构造后改也生效）。
+
+    经 __dict__ 读 _config 以容错 MagicMock / SimpleNamespace 等测试替身。
+    """
+    cfg = getattr(agent, "__dict__", {}).get("_config")
+    obs = getattr(cfg, "observability", None) if cfg is not None else None
+    return bool(getattr(obs, "enabled", False))
+
+
+def _truncate_str(value: Any, max_len: int = _TRACE_MAX_STR) -> Any:
+    """截断过长的字符串字段，控制 trace 体积。"""
+    if isinstance(value, str) and len(value) > max_len:
+        return value[:max_len] + f"...(truncated, total {len(value)} chars)"
+    return value
+
+
+def _message_to_dict(message: Any) -> dict[str, Any]:
+    """Message → dict，content 截断控制体积。"""
+    d = asdict(message)
+    if "content" in d:
+        d["content"] = _truncate_str(d["content"])
+    return d
+
+
 def _record_llm_trace(agent: Any, messages: list[Any], response: LLMResponse, model: str, t_start: float) -> None:
     """记录 llm span 到可观测性 trace；agent 未启用 trace 时 no-op（零开销）。"""
-    if not getattr(agent, "__dict__", {}).get("_trace_enabled", False):
+    if not _trace_enabled(agent):
         return
     agent._trace("llm", {
-        "model": model,
-        "messages": [asdict(m) for m in messages],
+        # response.model 是 LLM 实际返回的模型（网关/代理可能与配置不一致）
+        "model": response.model or model,
+        "messages": [_message_to_dict(m) for m in messages],
         "response": {
-            "content": response.content,
+            "content": _truncate_str(response.content),
             "tool_calls": [asdict(tc) for tc in (response.tool_calls or [])],
             "usage": response.usage,
             "finish_reason": response.finish_reason,

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import inspect
 import logging
 import time
@@ -18,7 +19,7 @@ from weave_agent_sdk.checkpoint import CheckpointManager
 from weave_agent_sdk.event_bus import EventBus
 from weave_agent_sdk.llm.factory import create_llm
 from weave_agent_sdk.llm.base import BaseLLM
-from weave_agent_sdk.loop.base import BaseLoop, _llm_call_in_flight, _tool_call_in_flight
+from weave_agent_sdk.loop.base import BaseLoop, _llm_call_in_flight, _tool_call_in_flight, _trace_enabled
 from weave_agent_sdk.loop.factory import LOOP_REGISTRY
 from weave_agent_sdk.memory.manager import MemoryManager
 from weave_agent_sdk.prompts.prompt_registry import PromptRegistry
@@ -106,11 +107,11 @@ class Weave:
         # 并发运行锁：每个事件循环一把，串行化并发调用（防止共享实例状态互相污染）
         self._run_locks: dict[Any, asyncio.Lock] = {}
 
-        # 可观测性：trace 采集状态（observability.enabled 时启用；默认关闭零开销）
-        self._trace_enabled: bool = self._config.observability.enabled
+        # 可观测性：trace 采集状态（enabled 动态读 config，构造后改也生效）
         self._trace_tree: dict[str, Any] | None = None            # 当前 run 的 trace 树（组装中）
-        self._trace_iteration: dict[str, Any] | None = None  # 当前迭代的 span dict
-        self._last_trace: dict[str, Any] | None = None       # 最近一次完成的 trace 树
+        self._trace_iteration: dict[str, Any] | None = None       # 当前迭代的 span dict
+        self._trace_mono_start: float | None = None               # run span 单调钟起点（算 elapsed）
+        self._last_trace: dict[str, Any] | None = None            # 最近一次完成的 trace 树
 
     # ── 公共 API ──────────────────────────────────────
 
@@ -432,8 +433,9 @@ class Weave:
             }
 
         注意：这是新增的只读入口，不改动 run()/arun() 的 LoopResult 结构。
+        返回深拷贝，避免外部修改内部 trace 状态。
         """
-        return self._last_trace
+        return copy.deepcopy(self._last_trace) if self._last_trace is not None else None
 
     def _trace(self, event_type: str, data: dict[str, Any] | None = None) -> None:
         """内部：记录可观测性 span。Loop 在关键点调用；关闭时 no-op（零开销）。
@@ -442,7 +444,7 @@ class Weave:
             iteration_end / run_end。Loop 只上报事件，不感知 trace 后端
             （符合「下层不感知上层」的设计哲学）。
         """
-        if not getattr(self, "_trace_enabled", False):
+        if not _trace_enabled(self):
             return
         data = data or {}
         if event_type == "run_start":
@@ -454,36 +456,53 @@ class Weave:
                 "started_at": time.time(),
                 "iterations_detail": [],
             }
+            self._trace_mono_start = time.monotonic()
             self._trace_iteration = None
         elif event_type == "iteration_start":
             self._trace_iteration = {"iteration": data.get("iteration", 0), "tools": []}
-            if getattr(self, "_trace_tree", None) is not None:
+            if self._trace_tree is not None:
                 self._trace_tree["iterations_detail"].append(self._trace_iteration)
         elif event_type == "memory_inject":
-            if self._trace_iteration is not None:
-                self._trace_iteration["memory_inject"] = data
+            it = self._ensure_trace_iteration()
+            if it is not None:
+                it["memory_inject"] = data
         elif event_type == "llm":
-            if self._trace_iteration is not None:
-                self._trace_iteration["llm"] = data
+            it = self._ensure_trace_iteration()
+            if it is not None:
+                it["llm"] = data
         elif event_type == "tool":
-            if self._trace_iteration is not None:
-                self._trace_iteration["tools"].append(data)
+            it = self._ensure_trace_iteration()
+            if it is not None:
+                it.setdefault("tools", []).append(data)
         elif event_type == "iteration_end":
             if self._trace_iteration is not None:
                 self._trace_iteration["stop_reason"] = data.get("stop_reason")
         elif event_type == "run_end":
-            if getattr(self, "_trace_tree", None) is not None:
+            if self._trace_tree is not None:
                 self._trace_tree.update({
                     "output": data.get("output", ""),
                     "iterations": data.get("iterations", 0),
                     "finished_at": time.time(),
                 })
-                self._trace_tree["elapsed_ms"] = int(
-                    (self._trace_tree["finished_at"] - self._trace_tree["started_at"]) * 1000
-                )
+                if self._trace_mono_start is not None:
+                    self._trace_tree["elapsed_ms"] = int(
+                        (time.monotonic() - self._trace_mono_start) * 1000
+                    )
                 self._last_trace = self._trace_tree
                 self._trace_tree = None
                 self._trace_iteration = None
+                self._trace_mono_start = None
+
+    def _ensure_trace_iteration(self) -> dict[str, Any] | None:
+        """确保存在一个迭代 span。
+
+        simple / scheduled loop 不发 iteration_start，其 llm / memory_inject /
+        tool span 需归到一个隐式的默认迭代（iteration=1），避免被静默丢弃。
+        """
+        if self._trace_iteration is None and self._trace_tree is not None:
+            self._trace_iteration = {"iteration": 1, "tools": []}
+            self._trace_tree["iterations_detail"].append(self._trace_iteration)
+        return self._trace_iteration
 
     # ── 内部实现 ──────────────────────────────────────
 
