@@ -126,6 +126,21 @@ prompts:
 | `state` | `set` / `get` / `delete` / `get_all` | 键值状态，新值覆盖旧值 |
 | `knowledge` | `add` / `search(query, top_k)` | 知识库，追加不覆盖，关键词搜索（chroma 后端为语义） |
 
+### 独立使用（不绑 Loop 编排）
+
+`MemoryManager` 可脱离 `Weave` 单独用——只借存储、不要单 agent 循环（多角色接力、自定义编排等宿主）：
+
+```python
+from weave_agent_sdk import MemoryManager, MemoryConfig
+
+mem = MemoryManager(MemoryConfig(default_backend="sqlite", default_path="./data.db"))
+mem.state.set("k", "v", "myscope:default:state")   # 同步读写
+mem.stream.append({"role": "user", "content": "hi"}, "myscope:default:stream")
+```
+
+独立使用享受**存储层能力**（单表 + namespace 隔离 + 三级访问模式 + TTL），
+不享受**编排能力**（记忆注入 / 自动持久化——那些只在 `Weave.run` 内发生）。
+
 ### Namespace 隔离
 
 作用域由**项目自定义**，格式 `{scope_name}:{scope_id}:{access_type}`，单表行级隔离：

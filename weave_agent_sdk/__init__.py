@@ -10,8 +10,10 @@
 
 from weave_agent_sdk.agent import Weave
 from weave_agent_sdk.config import load_config
+from weave_agent_sdk.memory.manager import MemoryManager
 from weave_agent_sdk.types import (
     LoopResult,
+    MemoryConfig,
     MemoryEntry,
     Message,
     SearchResult,
@@ -54,6 +56,8 @@ __all__ = [
     "register_loop",
     "register_memory_backend",
     "WeaveConfig",
+    "MemoryConfig",
+    "MemoryManager",
     "LoopResult",
     "SearchResult",
     "MemoryEntry",

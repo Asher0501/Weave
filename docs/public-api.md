@@ -63,6 +63,23 @@ LoopResult = namedtuple("LoopResult", [
 | `close()` | `() -> None` | 关闭所有后端连接 |
 | `cleanup()` | `() -> int` | 清理过期数据 |
 
+**独立使用**：`MemoryManager` 可脱离 `Weave` 编排独立实例化（适合「只需存储、不需单 agent 循环」的宿主）：
+
+```python
+from weave_agent_sdk import MemoryManager, MemoryConfig
+
+mem = MemoryManager(MemoryConfig(default_backend="sqlite", default_path="./data.db"))
+mem.state.set("k", "v", "myscope:default:state")          # 同步
+mem.stream.append({"role": "user", "content": "hi"}, "myscope:default:stream")
+```
+
+独立使用享受的是**存储层能力**（单表 + namespace 行级隔离 + 三级访问模式 + TTL），
+**不享受编排能力**（`before_think` 记忆注入 / `after_think` 自动持久化——那些只在 `Weave.run` 内发生）。
+
+**namespace 解析约定**（独立使用可直接依赖此契约）：格式 `{scope_name}:{scope_id}:{access_type}`，
+其中 `access_type` 恒为**最后一段**（∈ `stream` / `state` / `knowledge`），`scope_id` 可含冒号（多段）。例：
+`agora:run-1:agent-7:state` → `scope_name=agora`、`scope_id=run-1:agent-7`、`access_type=state`。
+
 ### 1.3 公开类型 — `weave.types`
 
 | 类型 | 字段 | 用途 |
