@@ -209,6 +209,73 @@ flowchart TB
 
 ---
 
+## 对外接口
+
+从 `weave_agent_sdk` 能拿到的接口，按「你要做什么」分四类：
+
+| 你要做的 | 接口 | 导入方式 |
+|---------|------|---------|
+| 跑一个 agent（编排） | `Weave` | `from weave_agent_sdk import Weave` |
+| 只用存储（不绑编排） | `MemoryManager` / `MemoryConfig` | `from weave_agent_sdk import MemoryManager, MemoryConfig` |
+| 只用 LLM（不绑编排） | `create_llm` / `BaseLLM` | `from weave_agent_sdk.llm.factory import create_llm` |
+| 读配置 | `load_config` | `from weave_agent_sdk import load_config` |
+| 注册自定义实现 | `register_llm` / `register_loop` / `register_memory_backend` | `from weave_agent_sdk import ...` |
+
+**① 编排入口 `Weave`** —— 一个 agent 跑起来：
+
+```python
+from weave_agent_sdk import Weave
+
+weave = Weave()                    # 零配置 / Weave("weave.yaml") / Weave(config=WeaveConfig(...))
+result = weave.run("问题")          # 同步；arun() 异步；stream() 流式
+
+@weave.tool                        # 注册工具（name / description / schema）
+def search(q: str) -> str: ...
+
+weave.memory          # 记忆访问（同步）
+weave.last_trace      # 本次 run 完整链路（可观测）
+weave.checkpoint()    # 状态回滚
+weave.status()        # 运行状态
+```
+
+**② 独立存储 `MemoryManager`** —— 只借单表 + namespace 隔离，不要编排：
+
+```python
+from weave_agent_sdk import MemoryManager, MemoryConfig
+
+mem = MemoryManager(MemoryConfig(default_backend="sqlite", default_path="./data.db"))
+mem.state.set("k", "v", "s:1:state")                     # 键值，覆盖
+mem.stream.append({"role": "user", "content": "hi"}, "s:1:stream")  # 时序流，追加
+mem.knowledge.add("知识片段", "kb:1:knowledge")            # 知识，追加 + 搜索
+```
+
+**③ 独立 LLM `create_llm`** —— 多 provider + 鉴权 + 模型解析；**无状态**（不绑对话上下文，上下文归 Memory/宿主管）：
+
+```python
+from weave_agent_sdk.llm.factory import create_llm
+from weave_agent_sdk.types import Message
+
+llm = create_llm(provider="deepseek")                     # anthropic / openai / deepseek
+resp = await llm.chat([Message(role="user", content="...")])
+print(resp.content)                                        # 文本；resp.tool_calls / usage / finish_reason
+```
+
+**④ 数据类型**（顶层导出，供构造 / 类型标注）：
+`WeaveConfig` · `MemoryConfig` · `Message` · `ToolCall` · `ToolResult` · `LoopResult` · `SearchResult` · `MemoryEntry` · `WeaveEvent`
+
+**扩展点 / 可选能力**（深层模块，实现特定抽象）：
+
+| 扩展什么 | 抽象 | 导入 |
+|---------|------|------|
+| 自定义循环策略 | `BaseLoop` | `weave_agent_sdk.loop.base` |
+| 自定义 LLM | `BaseLLM` | `weave_agent_sdk.llm.base` |
+| 自定义 Memory 后端 | `StreamMemory` / `StateMemory` / `KnowledgeMemory` | `weave_agent_sdk.memory.base` |
+| 可选功能 | `features.*` / `server.create_app` / `utils.json_extract.extract_json` | 对应子模块 |
+
+> **顶层导出**（`from weave_agent_sdk import X`）的是稳定公开 API；**深层模块**（`from weave_agent_sdk.<子模块> import X`）是扩展点，签名稳定但路径更细。完整契约见 [`docs/public-api.md`](docs/public-api.md)。
+
+---
+
 ## 特性一览
 
 | 类别 | 能力 |
