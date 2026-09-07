@@ -17669,3 +17669,35 @@ class TestObservability:
         t = weave.last_trace
         t["hacked"] = True
         assert "hacked" not in weave.last_trace
+
+    def test_last_trace_persists_to_jsonl(self, tmp_path):
+        """observability.path 配置时，trace 落盘为 JSONL（每 run 一行）。"""
+        import json
+        from weave_agent_sdk import Weave, WeaveConfig
+        from weave_agent_sdk.types import ObservabilityConfig, LoopConfig, LLMConfig
+        from weave_agent_sdk.llm.base import BaseLLM, LLMResponse
+
+        class _FakeLLM(BaseLLM):
+            async def chat(self, messages, tools=None, max_tokens=4096, temperature=0.7):
+                return LLMResponse(content="ok")
+
+            async def chat_stream(self, messages, tools=None, max_tokens=4096, temperature=0.7):
+                if False:
+                    yield
+                yield "x"
+
+        trace_path = str(tmp_path / "traces.jsonl")
+        cfg = WeaveConfig(
+            llm=LLMConfig(provider="anthropic", model="m"),
+            loop=LoopConfig(type="simple"),
+            observability=ObservabilityConfig(enabled=True, path=trace_path),
+        )
+        weave = Weave(config=cfg, llm=_FakeLLM())
+        weave.run("a")
+        weave.run("b")
+
+        with open(trace_path, encoding="utf-8") as f:
+            lines = f.readlines()
+        assert len(lines) == 2
+        assert json.loads(lines[0])["input"] == "a"
+        assert json.loads(lines[1])["input"] == "b"

@@ -361,5 +361,10 @@ def load_config(config_path: str | Path) -> WeaveConfig:
         ),
         observability=ObservabilityConfig(
             enabled=bool(observability_raw.get("enabled", False)),
+            path=(
+                _resolve_relative_path(str(observability_raw.get("path")), config_dir)
+                if observability_raw.get("path")
+                else None
+            ),
         ),
     )

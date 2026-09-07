@@ -492,6 +492,8 @@ class Weave:
                 self._trace_tree = None
                 self._trace_iteration = None
                 self._trace_mono_start = None
+                # 落盘（采集的一部分）：observability.path 配置时追加写 JSONL
+                self._persist_trace()
 
     def _ensure_trace_iteration(self) -> dict[str, Any] | None:
         """确保存在一个迭代 span。
@@ -503,6 +505,20 @@ class Weave:
             self._trace_iteration = {"iteration": 1, "tools": []}
             self._trace_tree["iterations_detail"].append(self._trace_iteration)
         return self._trace_iteration
+
+    def _persist_trace(self) -> None:
+        """落盘 trace 到 JSONL（每 run 追加一行）；采集的一部分，失败不影响主流程。"""
+        import json
+        path = self._config.observability.path
+        if not path or self._last_trace is None:
+            return
+        try:
+            p = Path(path)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with p.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(self._last_trace, ensure_ascii=False, default=str) + "\n")
+        except Exception as e:
+            logger.warning("Failed to persist trace to %s: %s", path, e)
 
     # ── 内部实现 ──────────────────────────────────────
 

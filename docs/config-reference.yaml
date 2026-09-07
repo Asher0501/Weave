@@ -87,5 +87,6 @@ checkpoint:                       # 状态回滚（docs/issues/012）
   trigger: after_each_tool        # after_each_tool | after_each_llm | manual
   keep: 10                        # 每 session 保留最近 N 个快照（fork 语义，淘汰最旧）
 
-observability:                    # 可观测性（weave.last_trace）
+observability:                    # 可观测性（weave.last_trace + 落盘）
   enabled: false                  # 是否采集本次 run 的完整链路；默认关闭（零开销）
+  # path: ./data/traces.jsonl     # 可选：落盘 JSONL（每 run 一行）；不写 = 仅内存 last_trace

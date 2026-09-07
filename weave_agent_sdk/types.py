@@ -282,8 +282,12 @@ class ObservabilityConfig:
     enabled: 是否采集本次 run 的完整链路（trace 树），可通过 weave.last_trace
         读取。默认 False（零开销，向后兼容）——采集需在 Loop 关键点记录 span，
         关闭时不产生任何额外工作。
+    path: 落盘路径（JSONL 文件，每 run 追加一行）。None = 不落盘，仅内存
+        last_trace。相对路径相对配置文件目录解析。落盘是采集的一部分（通用
+        JSONL、业务无关）；落盘后怎么用（分析 / 接看板）由调用者负责。
     """
     enabled: bool = False
+    path: str | None = None
 
 
 @dataclass(slots=True)
