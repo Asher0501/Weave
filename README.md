@@ -1,6 +1,6 @@
 # Weave
 
-> 非侵入式、基于 SDK 的 Agent 插件框架 —— 只做两件事：**Loop（循环）** 与 **Memory（记忆）**。
+> 非侵入式 Agent SDK —— 三个可独立使用的能力：**编排**（Loop）、**LLM 管理**、**Memory 记忆**。
 
 <p align="left">
   <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+">
@@ -8,23 +8,24 @@
   <img src="https://img.shields.io/badge/核心依赖-仅%20PyYAML-8a8a8a" alt="核心依赖仅 PyYAML">
 </p>
 
-**Weave** 把一个纯「请求-响应」的项目，变成一个「**能迭代、能记住**」的 Agent，只需 **5 行代码**。
+**Weave** 把一个纯「请求-响应」的项目，变成一个「能迭代、能记住」的 Agent，只需 **5 行代码**。
 
-- 🧩 **非侵入式** —— `pip install` + `import` + 配置，宿主业务代码一行不动
+- 🧩 **非侵入式** —— `pip install` + `import`，宿主业务代码一行不动
+- 🧩 **三能力独立** —— 编排 / LLM / Memory 可单独拿走用，不必整套绑一起
 - 🔌 **可插拔** —— Loop / LLM / Memory 后端均可注册扩展
-- 🧠 **三级记忆** —— `stream`（会话）· `state`（状态）· `knowledge`（知识），namespace 行级隔离
-- 🌐 **SDK 与 REST 同一抽象** —— `weave.run("...")` ≡ `POST /agents/default/run`
 
 ---
 
 ## 目录
 
 - [快速开始](#快速开始)
-- [核心概念](#核心概念)
+- [三大能力](#三大能力)
+  - [① 编排 `Weave`](#①-编排-weave)
+  - [② LLM 管理 `create_llm`](#②-llm-管理-create_llm)
+  - [③ Memory 记忆 `MemoryManager`](#③-memory-记忆-memorymanager)
 - [架构](#架构)
-- [特性一览](#特性一览)
 - [可插拔扩展](#可插拔扩展)
-- [运行流程](#运行流程)
+- [配置](#配置)
 - [示例](#示例)
 - [文档](#文档)
 - [License](#license)
@@ -38,9 +39,6 @@
 ```bash
 pip install weave-agent-sdk           # 核心（仅依赖 PyYAML）
 pip install "weave-agent-sdk[all]"    # 含 anthropic / openai / chromadb / fastapi
-
-# 本地开发（从仓库源码，editable）
-pip install -e .
 ```
 
 ### 脚手架（最快起步）
@@ -51,34 +49,186 @@ cd my_agent
 python agent.py              # 直接跑
 ```
 
-生成的文件是「标准等价文件」——与手写完全一致。高级功能（`memory.scopes` /
-`checkpoint` / `register_*` / 自定义 loop/llm）全部保留，随时在骨架上扩展，见
-[文档](#文档)。
-
 ### 5 行代码
 
 ```python
 from weave_agent_sdk import Weave
 
-weave = Weave()                      # 1. 零配置构造（凭证从环境变量读取）
+weave = Weave()                                       # 零配置（凭证从环境变量读取）
 
-@weave.tool(name="search", description="搜索")  # 2. 注册工具（显式命名 + 描述）
+@weave.tool(name="search", description="搜索")
 def search(query: str) -> str:
     return f"搜索结果：{query}"
 
-result = weave.run("我应该学什么？")   # 3. 跑起来
+result = weave.run("我应该学什么？")
 print(result.output)
 ```
 
-> 三种构造方式等价：`Weave()` 零配置 / `Weave("weave.yaml")` 读文件 /
-> `Weave(config=WeaveConfig(...))` 程序化。Memory 读写是**同步**的（无需 `await`）：
->
-> ```python
-> weave.memory.state.set("topic", "推荐系统", ns)   # 同步写
-> value = weave.memory.state.get("topic", ns)        # 同步读
-> ```
+---
 
-### 配置 `weave.yaml`
+## 三大能力
+
+### ① 编排 `Weave`
+
+把 LLM + Memory 串起来跑一个 agent：加载记忆 → 注入 prompt → 调 LLM →（调工具）→ 持久化对话。
+
+```python
+from weave_agent_sdk import Weave
+
+weave = Weave()                    # 零配置 / Weave("weave.yaml") / Weave(config=WeaveConfig(...))
+
+@weave.tool                        # 注册工具（name / description / schema）
+def search(q: str) -> str: ...
+
+result = weave.run("问题")          # 同步；arun() 异步；stream() 流式
+```
+
+| 能力 | 说明 |
+|------|------|
+| Loop 策略 | `simple`（一问一答）/ `iterative`（反复调工具）/ `scheduled`（cron 定时） |
+| 记忆编排 | run 时自动加载 `stream`/`state`/`knowledge` 注入 prompt，run 后自动持久化对话 |
+| 状态回滚 | `weave.checkpoint()` 打快照 / `weave.rollback()` 回滚 |
+| 可观测 | `weave.last_trace` 本次 run 完整链路（每轮注入了什么、LLM 看到了什么、工具怎么执行） |
+| 运行状态 | `weave.status()` / `weave.memory`（同步读写记忆） |
+
+运行流程：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Host as 宿主
+    participant W as Weave Agent
+    participant M as Memory
+    participant L as LLM
+
+    Host->>W: run(input, scope_hints)
+    W->>M: 激活作用域 + 加载记忆注入 prompt
+    W->>L: call_llm(messages)（带重试 + 硬超时）
+    L-->>W: response
+    W->>M: 持久化对话到 stream
+    W-->>Host: LoopResult(output, iterations, memory_updated)
+```
+
+### ② LLM 管理 `create_llm`
+
+多 provider + 鉴权 + 模型解析，**无状态**（不绑对话上下文，上下文归 Memory / 宿主管）。
+
+```python
+from weave_agent_sdk.llm.factory import create_llm
+from weave_agent_sdk.types import Message
+
+llm = create_llm(provider="deepseek")                  # anthropic / openai / deepseek
+resp = await llm.chat([Message(role="user", content="...")])
+print(resp.content)     # 文本；resp.tool_calls / usage / finish_reason
+```
+
+- 凭证从**标准环境变量**读取（`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY`），零硬编码。
+- 模型名经 `WEAVE_MODEL` / `{PROVIDER}_MODEL` 解析；provider 与模型明显不匹配会告警。
+- 流式 `chat_stream()` 逐 token；非流式 `chat()` 一次拿全。
+
+### ③ Memory 记忆 `MemoryManager`
+
+存储 + 隔离，**可脱离编排独立使用**（只借单表 + namespace 隔离，不要单 agent 循环）。
+
+```python
+from weave_agent_sdk import MemoryManager, MemoryConfig
+
+mem = MemoryManager(MemoryConfig(default_backend="sqlite", default_path="./data.db"))
+mem.state.set("k", "v", "s:1:state")                    # 键值，覆盖
+mem.stream.append({"role": "user", "content": "hi"}, "s:1:stream")  # 时序流，追加
+mem.knowledge.add("知识片段", "kb:1:knowledge")           # 知识，追加 + 搜索
+```
+
+三种访问模式（同一张表上的三种读写方式，不是三套存储）：
+
+| 模式 | 操作 | 语义 |
+|------|------|------|
+| `stream` | `append` / `last(N)` / `trim` | 时序流，追加，按时间取最近 N 条 |
+| `state` | `set` / `get` / `delete` / `get_all` | 键值，新值覆盖旧值 |
+| `knowledge` | `add` / `search(query, top_k)` | 追加不覆盖，关键词搜索（chroma 后端为语义） |
+
+**namespace 隔离**：格式 `{scope_name}:{scope_id}:{access_type}`，`access_type` 恒为最后一段，`scope_id` 可含冒号。
+
+```
+session:abc123:stream      → session abc123 的对话流
+domain:recsys:state        → "推荐系统" 领域的状态
+kb_global:default:knowledge → 全局知识库
+```
+
+在编排中，作用域由 `scope_hints` 传入 `run()` 自动隔离（`{"session_id": "A"}` 与 `{"session_id": "B"}` 互不可见）；独立使用时直接手写 namespace 字符串。
+
+---
+
+## 架构
+
+```mermaid
+flowchart TB
+    subgraph Integration["对外 · 稳定公开"]
+        SDK["Python SDK<br/>Weave · MemoryManager · create_llm"]
+        REST["REST Server<br/>FastAPI + WebSocket"]
+    end
+
+    subgraph Core["编排"]
+        Agent["Weave Agent"]
+        Loop["Loop Engine<br/>simple / iterative / scheduled"]
+        MemMgr["MemoryManager<br/>stream / state / knowledge"]
+        Tools["Tool Registry"]
+        Trace["Trace 采集<br/>span → last_trace"]
+    end
+
+    subgraph Adapter["可插拔"]
+        LLM["LLM<br/>anthropic / openai / deepseek"]
+        Store["Store<br/>sqlite / file / chroma"]
+        Prompt["Prompt Loader<br/>.md / .schema.yaml"]
+    end
+
+    SDK --> Agent
+    REST --> Agent
+    Agent --> Loop
+    Agent --> MemMgr
+    Agent --> Tools
+    Loop --> LLM
+    MemMgr --> Store
+    Agent --> Prompt
+    Loop -.span.-> Trace
+    MemMgr -.span.-> Trace
+```
+
+**规则**：上层依赖下层，下层不感知上层；Adapter 可平行扩展，Core 接口不变。
+虚线 `-.span.->` 表示 span 上报（可观测，非依赖）。
+
+---
+
+## 可插拔扩展
+
+内置实现是「预注册的默认值」，宿主可注册自定义实现并经配置引用：
+
+```python
+from weave_agent_sdk import register_llm, register_loop, register_memory_backend
+
+register_llm("my_gateway", my_gateway_factory)       # llm.provider: my_gateway
+register_loop("human_review", HumanReviewLoop)        # loop.type: human_review
+register_memory_backend("redis", RedisBackend)        # backend: redis
+```
+
+或运行期注入（离线 / 测试）：
+
+```python
+weave = Weave("weave.yaml", llm=FakeLLM())   # 不碰内部属性，直接注入
+```
+
+扩展点抽象（深层模块）：
+
+| 扩展什么 | 抽象 | 导入 |
+|---------|------|------|
+| 自定义 Loop | `BaseLoop` | `weave_agent_sdk.loop.base` |
+| 自定义 LLM | `BaseLLM` | `weave_agent_sdk.llm.base` |
+| 自定义 Memory 后端 | `StreamMemory` / `StateMemory` / `KnowledgeMemory` | `weave_agent_sdk.memory.base` |
+| REST 服务 | `create_app` | `weave_agent_sdk.server` |
+
+---
+
+## 配置
 
 ```yaml
 llm:
@@ -99,296 +249,19 @@ prompts:
   system: prompts/system.md            # prompt 从文件加载，模板变量注入
 ```
 
-> prompt 路径解析规则：`prompts/system.md`（带 `prompts/` 前缀）相对配置目录；
-> 裸名 `system` 走 registry 命名 prompt（同为 `prompts/system.md`）；`./system.md` 或
-> 绝对路径按文件直载。
-
-> 所有凭证从**标准环境变量**读取（`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
-> `DEEPSEEK_API_KEY` 等），代码与配置中**零硬编码**（API Key / Prompt / 模型名）。
-
----
-
-## 核心概念
-
-### Loop —— 三种循环策略
-
-| 策略 | 行为 | 适用场景 |
-|------|------|---------|
-| `simple` | 一次请求 → 一次响应，不调工具 | 问答、翻译、摘要 |
-| `iterative` | LLM 反复调用工具直到停止条件 | 工具调用、多步推理 |
-| `scheduled` | cron / 事件驱动，定时自动执行 | 监控、定期扫描 |
-
-### Memory —— 三种访问模式
-
-| 模式 | 操作 | 比喻 |
-|------|------|------|
-| `stream` | `append` / `last(N)` / `trim` | 对话历史，时序流 |
-| `state` | `set` / `get` / `delete` / `get_all` | 键值状态，新值覆盖旧值 |
-| `knowledge` | `add` / `search(query, top_k)` | 知识库，追加不覆盖，关键词搜索（chroma 后端为语义） |
-
-### 独立使用（不绑 Loop 编排）
-
-`MemoryManager` 可脱离 `Weave` 单独用——只借存储、不要单 agent 循环（多角色接力、自定义编排等宿主）：
-
-```python
-from weave_agent_sdk import MemoryManager, MemoryConfig
-
-mem = MemoryManager(MemoryConfig(default_backend="sqlite", default_path="./data.db"))
-mem.state.set("k", "v", "myscope:default:state")   # 同步读写
-mem.stream.append({"role": "user", "content": "hi"}, "myscope:default:stream")
-```
-
-独立使用享受**存储层能力**（单表 + namespace 隔离 + 三级访问模式 + TTL），
-不享受**编排能力**（记忆注入 / 自动持久化——那些只在 `Weave.run` 内发生）。
-
-### Namespace 隔离
-
-作用域由**项目自定义**，格式 `{scope_name}:{scope_id}:{access_type}`，单表行级隔离：
-
-```
-session:abc123:stream     → session abc123 的对话流
-domain:recsys:state       → "推荐系统" 领域的状态
-kb_global:default:knowledge → 全局知识库
-```
-
-同一个 `Weave` 实例内，不同 `scope_hints` 天然隔离不同会话/人设的记忆——这是多租户、多人设场景的基础。
-
-`scope_hints` 是 `{scope_name}_id → scope_id` 的映射，在 `run()` / `arun()` 时传入：
-
-```python
-# weave.yaml 配置了 session / persona 两个 scope
-weave = Weave("weave.yaml")
-
-# 会话 A/B、人设 P1/P2 的记忆彼此隔离
-result_a = weave.run("问题", scope_hints={"session_id": "A", "persona_id": "P1"})
-result_b = weave.run("问题", scope_hints={"session_id": "B", "persona_id": "P2"})
-```
-
-未提供 `{scope_name}_id` 时，回退 scope_name 作为稳定的默认 scope_id（跨运行持久）。
-
----
-
-## 架构
-
-```mermaid
-flowchart TB
-    subgraph Integration["Integration Layer · 对外，不可变"]
-        SDK["Python SDK<br/>run() / arun() / stream() / last_trace"]
-        REST["REST Server<br/>FastAPI + WebSocket"]
-    end
-
-    subgraph Core["Core Layer · 编排"]
-        Agent["Weave Agent"]
-        Loop["Loop Engine<br/>simple / iterative / scheduled"]
-        Memory["Memory Manager<br/>stream / state / knowledge"]
-        Tools["Tool Registry"]
-        Trace["Trace 采集<br/>span → last_trace"]
-    end
-
-    subgraph Adapter["Adapter Layer · 可插拔"]
-        LLM["LLM Adapters<br/>anthropic / openai / deepseek"]
-        Store["Store Adapters<br/>sqlite / file / chroma"]
-        Prompt["Prompt Loader<br/>.md / .schema.yaml"]
-    end
-
-    SDK --> Agent
-    REST --> Agent
-    Agent --> Loop
-    Agent --> Memory
-    Agent --> Tools
-    Loop --> LLM
-    Memory --> Store
-    Agent --> Prompt
-    Loop -.span.-> Trace
-    Memory -.span.-> Trace
-```
-
-**规则**：上层依赖下层，下层不感知上层；Adapter 可平行扩展，Core 接口不变。
-虚线 `-.span.->` 表示 span 上报（可观测，非依赖）——Loop/Memory 只上报结构化事件，
-不感知 Trace 采集。
-
----
-
-## 对外接口
-
-从 `weave_agent_sdk` 能拿到的接口，按「你要做什么」分四类：
-
-| 你要做的 | 接口 | 导入方式 |
-|---------|------|---------|
-| 跑一个 agent（编排） | `Weave` | `from weave_agent_sdk import Weave` |
-| 只用存储（不绑编排） | `MemoryManager` / `MemoryConfig` | `from weave_agent_sdk import MemoryManager, MemoryConfig` |
-| 只用 LLM（不绑编排） | `create_llm` / `BaseLLM` | `from weave_agent_sdk.llm.factory import create_llm` |
-| 读配置 | `load_config` | `from weave_agent_sdk import load_config` |
-| 注册自定义实现 | `register_llm` / `register_loop` / `register_memory_backend` | `from weave_agent_sdk import ...` |
-
-**① 编排入口 `Weave`** —— 一个 agent 跑起来：
-
-```python
-from weave_agent_sdk import Weave
-
-weave = Weave()                    # 零配置 / Weave("weave.yaml") / Weave(config=WeaveConfig(...))
-result = weave.run("问题")          # 同步；arun() 异步；stream() 流式
-
-@weave.tool                        # 注册工具（name / description / schema）
-def search(q: str) -> str: ...
-
-weave.memory          # 记忆访问（同步）
-weave.last_trace      # 本次 run 完整链路（可观测）
-weave.checkpoint()    # 状态回滚
-weave.status()        # 运行状态
-```
-
-**② 独立存储 `MemoryManager`** —— 只借单表 + namespace 隔离，不要编排：
-
-```python
-from weave_agent_sdk import MemoryManager, MemoryConfig
-
-mem = MemoryManager(MemoryConfig(default_backend="sqlite", default_path="./data.db"))
-mem.state.set("k", "v", "s:1:state")                     # 键值，覆盖
-mem.stream.append({"role": "user", "content": "hi"}, "s:1:stream")  # 时序流，追加
-mem.knowledge.add("知识片段", "kb:1:knowledge")            # 知识，追加 + 搜索
-```
-
-**③ 独立 LLM `create_llm`** —— 多 provider + 鉴权 + 模型解析；**无状态**（不绑对话上下文，上下文归 Memory/宿主管）：
-
-```python
-from weave_agent_sdk.llm.factory import create_llm
-from weave_agent_sdk.types import Message
-
-llm = create_llm(provider="deepseek")                     # anthropic / openai / deepseek
-resp = await llm.chat([Message(role="user", content="...")])
-print(resp.content)                                        # 文本；resp.tool_calls / usage / finish_reason
-```
-
-**④ 数据类型**（顶层导出，供构造 / 类型标注）：
-`WeaveConfig` · `MemoryConfig` · `Message` · `ToolCall` · `ToolResult` · `LoopResult` · `SearchResult` · `MemoryEntry` · `WeaveEvent`
-
-**扩展点 / 可选能力**（深层模块，实现特定抽象）：
-
-| 扩展什么 | 抽象 | 导入 |
-|---------|------|------|
-| 自定义循环策略 | `BaseLoop` | `weave_agent_sdk.loop.base` |
-| 自定义 LLM | `BaseLLM` | `weave_agent_sdk.llm.base` |
-| 自定义 Memory 后端 | `StreamMemory` / `StateMemory` / `KnowledgeMemory` | `weave_agent_sdk.memory.base` |
-| 可选功能 | `features.*` / `server.create_app` / `utils.json_extract.extract_json` | 对应子模块 |
-
-> **顶层导出**（`from weave_agent_sdk import X`）的是稳定公开 API；**深层模块**（`from weave_agent_sdk.<子模块> import X`）是扩展点，签名稳定但路径更细。完整契约见 [`docs/public-api.md`](docs/public-api.md)。
-
----
-
-## 特性一览
-
-| 类别 | 能力 |
-|------|------|
-| **入口** | 三种构造（零配置 / yaml / 程序化）· 同步 `run()` · 异步 `arun()` · 流式 `stream()` |
-| **Loop** | `simple` / `iterative` / `scheduled`（cron + 事件驱动） |
-| **Memory** | `stream` / `state` / `knowledge`，**同步读写**，TTL 过期，namespace 隔离 |
-| **Tool** | `@weave.tool` 支持显式 `name` / `description` / `schema` |
-| **LLM** | anthropic / openai / deepseek，流式与非流式 |
-| **存储后端** | sqlite（默认，WAL）/ file / chroma（向量语义搜索） |
-| **Prompt** | `.md` 模板 + `.schema.yaml` 声明式组装，变量 `{{ }}` 注入 |
-| **Server** | FastAPI REST + WebSocket 流式，与 SDK 同抽象 |
-| **可观测** | `weave.last_trace` 完整 run 链路（iteration / llm / tool / memory 注入），默认关闭零开销 |
-| **非功能** | LLM 调用重试 / 硬超时 / Prompt 注入防御（内置接线，默认生效） |
-
----
-
-## 可观测性
-
-开启 `observability.enabled` 后，`weave.last_trace` 返回本次 run 的完整链路——每轮迭代
-注入了哪段 memory、发给 LLM 的 messages、LLM 返回了什么（含 token 用量）、每个工具的
-执行结果，以及停止原因。
-
-```python
-from weave_agent_sdk import Weave, WeaveConfig
-from weave_agent_sdk.types import ObservabilityConfig
-
-weave = Weave(config=WeaveConfig(observability=ObservabilityConfig(enabled=True)), llm=...)
-
-result = weave.run("问题")
-trace = weave.last_trace
-# trace["iterations_detail"] = [
-#     {"iteration": 1,
-#      "memory_inject": {"stream": [...], "state": {...}, "knowledge": [...]},
-#      "llm": {"model": "...", "messages": [...], "response": {...}, "elapsed_ms": int},
-#      "tools": [{"name": "...", "arguments": {...}, "result": ..., "error": ..., "elapsed_ms": int}],
-#      "stop_reason": "no_tool_calls"},
-#     ...
-# ]
-```
-
-或经 `weave.yaml`：
-
-```yaml
-observability:
-  enabled: true
-```
-
-> `last_trace` 是**通用数据**（业务无关 dict），weave 只负责采集、不绑定消费方式。
-> 是否落盘 / 接外部看板（Langfuse 等）是宿主自己的事——weave 不内置任何特定厂商适配器。
-
----
-
-## 可插拔扩展
-
-内置实现只是「预注册的默认值」，宿主可注册自定义实现，并经配置引用：
-
-```python
-from weave_agent_sdk import register_llm, register_loop, register_memory_backend
-
-register_llm("my_gateway", my_gateway_factory)       # llm.provider: my_gateway
-register_loop("human_review", HumanReviewLoop)        # loop.type: human_review
-register_memory_backend("redis", RedisBackend)        # backend: redis
-```
-
-或运行期注入（离线 / 测试）：
-
-```python
-weave = Weave("weave.yaml", llm=FakeLLM())   # 不碰内部属性，直接注入
-```
-
----
-
-## 运行流程
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Host as 宿主
-    participant W as Weave Agent
-    participant M as Memory
-    participant L as LLM
-
-    Host->>W: run(input, scope_hints)
-    W->>M: activate_scopes() 激活作用域
-    W->>M: 加载 stream / state / knowledge 注入 prompt
-    W->>L: call_llm(messages)（带重试 + 硬超时）
-    L-->>W: response
-    W->>M: 持久化 user / assistant 到 stream
-    W-->>Host: LoopResult(output, iterations, memory_updated)
-```
+> 所有凭证从**标准环境变量**读取，代码与配置中零硬编码。
+> 完整配置项见 [`docs/config-reference.yaml`](docs/config-reference.yaml)。
 
 ---
 
 ## 示例
 
-仓库 `demo/` 内附一个可运行的**三人设对话 Demo**：三个人设共享同一份客观上下文，
-但各自会话、记忆、保存结果彼此隔离。
+仓库 `demo/` 内附可运行的**三人设对话 Demo**：三个人设共享同一份客观上下文，各自记忆隔离。
 
 ```bash
 cd demo
 python main.py           # 离线（FakeLLM，无需 API Key）
 python main.py --real    # 真实模型
-```
-
-```
-你 > 客户投诉支付成功但订单未生成，怎么办？
-
-【理性分析者】  ……结构化五步：止血 → 定位 → 量化 → 修复 → 报告
-【激进冒险者】  ……立刻回滚灰度 + 直接补单，行动导向
-【保守谨慎者】  ……先冻结灰度、核对时序、逐步放量，风险优先
-
-你 > /report            # 查看隔离证据：共享上下文 + 各人设私有记忆
 ```
 
 ---
@@ -397,11 +270,12 @@ python main.py --real    # 真实模型
 
 | 文档 | 内容 |
 |------|------|
-| [`docs/basic.md`](docs/basic.md) | 基础事实与约束（设计红线 R1–R7） |
-| [`docs/public-api.md`](docs/public-api.md) | 稳定公开 API 清单 |
-| [`docs/internal-utilities.md`](docs/internal-utilities.md) | 内部非功能工具（排查用） |
+| [`docs/public-api.md`](docs/public-api.md) | 稳定公开 API 清单 + 契约 |
+| [`docs/config-reference.yaml`](docs/config-reference.yaml) | 完整配置参考 |
+| [`docs/basic.md`](docs/basic.md) | 基础事实与约束（设计红线） |
+| [`docs/internal-utilities.md`](docs/internal-utilities.md) | 内部非功能工具 |
 | [`DESIGN.md`](DESIGN.md) | 完整设计文档 |
-| [`docs/issues/`](docs/issues/) | 设计决策记录（001–012） |
+| [`docs/issues/`](docs/issues/) | 设计决策记录 |
 
 ---
 
