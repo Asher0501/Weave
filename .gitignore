@@ -15,3 +15,6 @@ data/
 
 # 个人/编辑器本地配置（不入库）
 .obsidian/
+
+# 测试残渣：MagicMock 路径下被写出的假文件（历史误入库）
+MagicMock/
