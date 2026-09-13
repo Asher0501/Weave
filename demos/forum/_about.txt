@@ -1,0 +1,7 @@
+"""agora × weave v0.4 测试脚本（自包含，不依赖工作目录）。
+
+用法：
+    python demos/forum/smoke_real_llm.py            # 1 次真实 DeepSeek 调用（验证接线+网络+Key）
+    python demos/forum/run_brainstorm_offline.py    # FakeLLM 跑完整 brainstorm（不触网、零成本）
+真实 brainstorm 请用 PowerShell 脚本 run_brainstorm_real.ps1（自动注入 Key，不回显）。
+"""

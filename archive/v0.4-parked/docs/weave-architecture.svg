@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1260" height="860" viewBox="0 0 1260 860"
+     font-family="Segoe UI, Microsoft YaHei, PingFang SC, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/><stop offset="55%" stop-color="#101a35"/><stop offset="100%" stop-color="#0a0e1c"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6ea8ff" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#6ea8ff" stop-opacity="0.10"/>
+    </linearGradient>
+    <linearGradient id="layer" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.030"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9dc1ff"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff7d7d"/>
+    </marker>
+    <style>
+      .t  { fill:#eaf0ff; }
+      .d  { fill:#b9c7e6; }
+      .m  { fill:#8ea3c8; }
+      .chip { fill:#ffffff; fill-opacity:0.07; stroke:#ffffff; stroke-opacity:0.16; }
+      .box  { fill:url(#layer); stroke:#ffffff; stroke-opacity:0.18; }
+      .boxc { fill:url(#core); stroke:#7fb0ff; stroke-opacity:0.75; stroke-width:2; }
+      .h  { font-size:15px; font-weight:700; letter-spacing:0.4px; }
+      .l  { font-size:13px; }
+      .s  { font-size:11.5px; }
+      .tag { font-size:11px; font-weight:700; letter-spacing:1.2px; }
+      .mono { font-family: Consolas, Consolas, "Courier New", monospace; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1260" height="860" fill="url(#bg)"/>
+
+  <!-- title -->
+  <text x="46" y="52" class="t" font-size="24" font-weight="700">Weave v0.4 · 架构图（原子组件库）</text>
+  <text x="46" y="76" class="m" font-size="13">weave 只交付原子件；循环 / 上下文 / Agent / 工具绑定 / 装配 = 调用方代码（示例在 demos/atomic）</text>
+
+  <!-- ============ L1 business ============ -->
+  <text x="46" y="118" class="tag" fill="#9dc1ff">业务 / 消费方（外部仓库）</text>
+  <rect x="46" y="128" width="558" height="118" rx="16" class="box"/>
+  <text x="66" y="156" class="t h">agora 接力引擎（14_forum）</text>
+  <text x="66" y="180" class="d l mono">adapter/llm.py → Provider 契约</text>
+  <text x="66" y="202" class="d l mono">adapter/repository.py → StateStore 契约</text>
+  <text x="66" y="228" class="m s">自己的编排（relay/session）、自己的命名（agora:&lt;run&gt;:…）</text>
+
+  <rect x="628" y="128" width="586" height="118" rx="16" class="box"/>
+  <text x="648" y="156" class="t h">agora-web 界面层</text>
+  <text x="648" y="180" class="d l mono">file_tools.py → 实现 ToolRegistry（读项目文件）</text>
+  <text x="648" y="202" class="d l mono">agentic_llm.py → 组合 Provider+ToolRegistry 的工具循环</text>
+  <text x="648" y="228" class="m s">REST/WS 桥 · 前端 SPA（液态玻璃）</text>
+
+  <!-- dependency arrow (business -> core) -->
+  <line x1="36" y1="252" x2="36" y2="700" stroke="#9dc1ff" stroke-width="2" marker-end="url(#arrow)"/>
+  <text transform="translate(24,480) rotate(-90)" class="d s" text-anchor="middle">单向依赖：上层 → 下层</text>
+
+  <!-- ============ L2 composition ============ -->
+  <text x="46" y="292" class="tag" fill="#9dc1ff">调用方组合层（示例 · 不随包）</text>
+  <rect x="46" y="302" width="1168" height="112" rx="16" class="box"/>
+  <text x="66" y="330" class="t h">demos/atomic/</text>
+  <rect x="66" y="344" width="264" height="52" rx="12" class="chip"/>
+  <text x="82" y="366" class="d l">context_builder.py</text><text x="82" y="386" class="m s">上下文投影（历史由调用方选址）</text>
+  <rect x="344" y="344" width="264" height="52" rx="12" class="chip"/>
+  <text x="360" y="366" class="d l">loop.py（run_turn）</text><text x="360" y="386" class="m s">翻译循环：调度+工具回填</text>
+  <rect x="622" y="344" width="264" height="52" rx="12" class="chip"/>
+  <text x="638" y="366" class="d l">tool_registry.py</text><text x="638" y="386" class="m s">@tool / 注解推断 / 线程池</text>
+  <rect x="900" y="344" width="294" height="52" rx="12" class="chip"/>
+  <text x="916" y="366" class="d l">agent.py（极薄容器）</text><text x="916" y="386" class="m s">组合以上组件，可选</text>
+
+  <!-- ============ L3 implementations ============ -->
+  <text x="46" y="456" class="tag" fill="#9dc1ff">参考实现层（随包 · 不进兼容承诺）</text>
+  <rect x="46" y="466" width="372" height="132" rx="16" class="box"/>
+  <text x="66" y="494" class="t h">weave.stores</text>
+  <text x="66" y="520" class="d l mono">InMemoryStateStore</text>
+  <text x="66" y="542" class="d l mono">SQLiteStateStore（WAL）</text>
+  <text x="66" y="564" class="d l mono">RedisStateStore（extra）</text>
+  <text x="66" y="586" class="m s">实现 StateStore + 可选能力</text>
+
+  <rect x="444" y="466" width="372" height="132" rx="16" class="box"/>
+  <text x="464" y="494" class="t h">weave.providers</text>
+  <text x="464" y="520" class="d l mono">OpenAICompatibleProvider</text>
+  <text x="464" y="542" class="m s">重试/超时/错误分类 · DeepSeek 特性</text>
+  <text x="464" y="566" class="d l mono">FakeProvider（离线确定性）</text>
+  <text x="464" y="588" class="m s">实现 Provider</text>
+
+  <rect x="842" y="466" width="372" height="132" rx="16" class="box"/>
+  <text x="862" y="494" class="t h">weave.capabilities</text>
+  <text x="862" y="520" class="d l mono">TraceSink（EventSink 实现）</text>
+  <text x="862" y="542" class="d l mono">CheckpointManager</text>
+  <text x="862" y="564" class="m s">基于 ListableStore 的快照/回滚</text>
+  <text x="862" y="586" class="m s">可选工具（核心不依赖）</text>
+
+  <!-- arrows impl -> core -->
+  <line x1="232" y1="602" x2="232" y2="640" stroke="#9dc1ff" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="630" y1="602" x2="630" y2="640" stroke="#9dc1ff" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1028" y1="602" x2="1028" y2="640" stroke="#9dc1ff" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ============ L4 core ============ -->
+  <text x="46" y="638" class="tag" fill="#7fb0ff">★ 唯一稳定契约（weave.core · 零第三方依赖）</text>
+  <rect x="46" y="650" width="1168" height="150" rx="18" class="boxc"/>
+  <rect x="70" y="672" width="266" height="62" rx="12" class="chip"/>
+  <text x="86" y="696" class="t l" font-weight="700">Provider</text>
+  <text x="86" y="718" class="m s mono">complete(messages, tools)</text>
+  <rect x="352" y="672" width="298" height="62" rx="12" class="chip"/>
+  <text x="368" y="696" class="t l" font-weight="700">StateStore（+ 可选能力）</text>
+  <text x="368" y="718" class="m s mono">get/set/delete/append ↔ Searchable/Trim/List</text>
+  <rect x="666" y="672" width="248" height="62" rx="12" class="chip"/>
+  <text x="682" y="696" class="t l" font-weight="700">ToolRegistry</text>
+  <text x="682" y="718" class="m s mono">get_schemas / execute</text>
+  <rect x="930" y="672" width="262" height="62" rx="12" class="chip"/>
+  <text x="946" y="696" class="t l" font-weight="700">EventSink</text>
+  <text x="946" y="718" class="m s mono">emit(type, data)（默认 Noop）</text>
+
+  <rect x="70" y="748" width="1122" height="36" rx="10" class="chip"/>
+  <text x="86" y="771" class="d l">共享基类型（冻结契约）：Message · ToolCall · ToolSchema · ToolResult · LLMResponse(reasoning 绝不回传) · StreamChunk · SearchHit ｜ 类型化错误树 ｜ codec</text>
+
+  <!-- ============ right rail invariants ============ -->
+  <rect x="46" y="812" width="1168" height="34" rx="10" class="chip"/>
+  <text x="66" y="834" class="m s">不变量：namespace/key 零约定（不透明字符串） · 消息类型化 · 核心零第三方依赖 · 下层不反向依赖上层（测试门禁：core 不 import capabilities/demos）</text>
+
+  <!-- forbidden reverse dependency -->
+  <line x1="1226" y1="700" x2="1226" y2="252" stroke="#ff7d7d" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#arrowRed)"/>
+  <text transform="translate(1248,480) rotate(-90)" fill="#ff9d9d" font-size="12" text-anchor="middle">禁止反向依赖</text>
+</svg>

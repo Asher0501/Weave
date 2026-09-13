@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="920" viewBox="0 0 1280 920"
+     font-family="Segoe UI, Microsoft YaHei, PingFang SC, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/><stop offset="55%" stop-color="#111a36"/><stop offset="100%" stop-color="#090d19"/>
+    </linearGradient>
+    <linearGradient id="atom" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4fe3c1" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#4fe3c1" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="mgmt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6ea8ff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#6ea8ff" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="biz" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b08cff" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#b08cff" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="impl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.09"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
+    </linearGradient>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9dc1ff"/>
+    </marker>
+    <marker id="arRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ff7d7d"/>
+    </marker>
+    <style>
+      .t{fill:#eaf0ff}.d{fill:#bcc9e8}.m{fill:#8ea3c8}
+      .h{font-size:15px;font-weight:700}.l{font-size:13px}.s{font-size:11.5px}
+      .tag{font-size:11px;font-weight:700;letter-spacing:1.3px}
+      .mono{font-family:Consolas,"Courier New",monospace}
+      .chip{fill:#ffffff;fill-opacity:0.07;stroke:#ffffff;stroke-opacity:0.16}
+    </style>
+  </defs>
+  <rect width="1280" height="920" fill="url(#bg)"/>
+
+  <text x="46" y="50" class="t" font-size="24" font-weight="700">Weave 分层（按你的意图）：两个原子 + 两个管理</text>
+  <text x="46" y="74" class="m" font-size="13">原子=哑件（零策略）；管理=策略（超时/重试/异常、namespace 解析与选址）；业务=调用方自己组合</text>
+
+  <!-- ===== 业务层 ===== -->
+  <rect x="46" y="98" width="1160" height="86" rx="16" fill="url(#biz)" stroke="#b08cff" stroke-opacity="0.45"/>
+  <text x="66" y="126" class="tag" fill="#c9b0ff">⑤ 业务 / 调用方（不属于 weave）</text>
+  <text x="66" y="152" class="d l">循环（要不要、怎么循环） · 上下文投影 · Agent 容器 · 业务规则 · 工具实现</text>
+  <text x="66" y="172" class="m s">只依赖管理层的公开方法；不接触原子层实现细节</text>
+
+  <line x1="626" y1="184" x2="626" y2="216" stroke="#9dc1ff" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- ===== 管理层 ===== -->
+  <text x="46" y="216" class="tag" fill="#9dc1ff">④ 管理层（weave 上层封装 · 策略在此）</text>
+  <rect x="46" y="226" width="566" height="212" rx="16" fill="url(#mgmt)" stroke="#6ea8ff" stroke-opacity="0.55"/>
+  <text x="66" y="254" class="t h">LLM 会话管理</text>
+  <text x="66" y="280" class="d l">· 超时：单次调用 / 整序列硬上限</text>
+  <text x="66" y="302" class="d l">· 重试 + 指数退避 + 抖动（可配置）</text>
+  <text x="66" y="324" class="d l">· 失败处理：错误分类（429/5xx 可重试；401/403/400/402 直抛）</text>
+  <text x="66" y="346" class="d l">· 流式聚合（token/reasoning/finish）</text>
+  <text x="66" y="368" class="d l">· usage 统计 · 可选：工具往返循环（tool_calls→执行→回填）</text>
+  <text x="66" y="394" class="m s">← “重试/超时”从 Provider 上移到这里（原 T2 被本图取代）</text>
+  <rect x="66" y="404" width="526" height="24" rx="8" class="chip"/>
+  <text x="80" y="421" class="m s">上层可换任意 Provider（含第三方 SDK）而策略不变</text>
+
+  <rect x="640" y="226" width="566" height="212" rx="16" fill="url(#mgmt)" stroke="#6ea8ff" stroke-opacity="0.55"/>
+  <text x="660" y="254" class="t h">命名空间管理</text>
+  <text x="660" y="280" class="d l">· scope/namespace 解析与约定（默认值、优先级、隔离）</text>
+  <text x="660" y="302" class="d l">· 按 namespace 选址：用哪个库/文件/后端</text>
+  <text x="660" y="324" class="d l">· 有序会话底层：append / tail(n) / 裁剪 / TTL</text>
+  <text x="660" y="346" class="d l">· 多后端路由与降级</text>
+  <text x="660" y="372" class="m s">← “namespace 到数据库的管理”就是这一层</text>
+  <rect x="660" y="396" width="526" height="32" rx="8" class="chip"/>
+  <text x="674" y="417" class="m s mono">resolve(scope_hint) → namespace · open(namespace) → Database</text>
+
+  <!-- arrows mgmt -> atoms -->
+  <line x1="330" y1="438" x2="330" y2="486" stroke="#9dc1ff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="924" y1="438" x2="924" y2="486" stroke="#9dc1ff" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="342" y="468" class="m s">只调用原子接口（不依赖实现）</text>
+  <text x="936" y="468" class="m s">只调用原子接口（不依赖实现）</text>
+
+  <!-- ===== 原子层 ===== -->
+  <text x="46" y="492" class="tag" fill="#7ff0d6">①② 原子层（仅两个接口 · 零策略 · 零第三方依赖）</text>
+  <rect x="46" y="502" width="566" height="196" rx="16" fill="url(#atom)" stroke="#4fe3c1" stroke-opacity="0.65" stroke-width="2"/>
+  <text x="66" y="532" class="t h">① LLM Provider（哑）</text>
+  <text x="66" y="560" class="d l mono">async complete(messages, tools=None, **opts) → LLMResponse</text>
+  <text x="66" y="584" class="d l mono">async stream(messages, tools=None, **opts) → AsyncIterator[Chunk]</text>
+  <text x="66" y="612" class="m s">一次请求一次响应；失败即抛（不重试、不计时、不分类）</text>
+  <text x="66" y="634" class="m s">只做协议/格式适配（消息↔厂商格式、工具 schema 转换）</text>
+  <text x="66" y="660" class="m s">可替换：OpenAI 兼容 / Anthropic / 第三方 SDK / 网关</text>
+
+  <rect x="640" y="502" width="566" height="196" rx="16" fill="url(#atom)" stroke="#4fe3c1" stroke-opacity="0.65" stroke-width="2"/>
+  <text x="660" y="532" class="t h">② Database（哑）</text>
+  <text x="660" y="560" class="d l mono">async get(ns, key) · set(ns, key, value)</text>
+  <text x="660" y="584" class="d l mono">async delete(ns, key) · append(ns, key, value)</text>
+  <text x="660" y="608" class="d l mono">async list(ns, prefix="") → list[key]</text>
+  <text x="660" y="636" class="m s">纯读写（namespace 视为不透明字符串）</text>
+  <text x="660" y="658" class="m s">不做重试/裁剪/TTL/检索/解析 → 这些都归管理层或调用方</text>
+
+  <!-- arrows impl -> atoms -->
+  <line x1="330" y1="698" x2="330" y2="742" stroke="#7ff0d6" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="924" y1="698" x2="924" y2="742" stroke="#7ff0d6" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- ===== 参考实现 ===== -->
+  <text x="46" y="748" class="tag" fill="#9dc1ff">参考实现（可替换 · 不进兼容承诺）</text>
+  <rect x="46" y="758" width="566" height="66" rx="14" fill="url(#impl)" stroke="#ffffff" stroke-opacity="0.16"/>
+  <text x="66" y="784" class="d l mono">OpenAICompatibleProvider · AnthropicProvider · FakeProvider</text>
+  <text x="66" y="806" class="m s">实现 Provider 原子（不含重试/超时）</text>
+  <rect x="640" y="758" width="566" height="66" rx="14" fill="url(#impl)" stroke="#ffffff" stroke-opacity="0.16"/>
+  <text x="660" y="784" class="d l mono">InMemoryDatabase · SQLiteDatabase · RedisDatabase</text>
+  <text x="660" y="806" class="m s">实现 Database 原子（不含策略）</text>
+
+  <!-- invariants -->
+  <rect x="46" y="842" width="1160" height="30" rx="10" class="chip"/>
+  <text x="66" y="862" class="m s">红线：原子层不依赖管理层；管理层不依赖业务层；换任一原子实现，管理层与业务层测试必须仍绿（替换测试）</text>
+
+  <!-- forbidden reverse dependency -->
+  <line x1="1236" y1="770" x2="1236" y2="200" stroke="#ff7d7d" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#arRed)"/>
+  <text transform="translate(1258,470) rotate(-90)" fill="#ff9d9d" font-size="12" text-anchor="middle">禁止反向依赖</text>
+
+  <!-- left dependency note -->
+  <line x1="26" y1="184" x2="26" y2="770" stroke="#9dc1ff" stroke-width="2" marker-end="url(#ar)"/>
+  <text transform="translate(14,480) rotate(-90)" class="d s" text-anchor="middle">单向依赖：上层 → 下层</text>
+</svg>

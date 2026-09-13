@@ -1,0 +1,80 @@
+name: ci
+
+# weave 的测试是**全离线**的（注入假 transport：不联网、不需要 API key），
+# 所以 CI 不需要任何 secret。
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install (editable, 零运行依赖)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: 全部测试（离线）
+        run: python -m pytest tests/v04 -q
+
+      - name: 契约与门禁（单独跑一遍，失败时信息更清楚）
+        run: python -m pytest tests/v04/test_contracts.py -q
+
+  gates:
+    name: 仓库卫生与门禁
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 元数据可解析（pyproject / 包导入）
+        run: |
+          python - <<'PY'
+          import tomllib, pathlib
+          data = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))
+          assert data["project"]["name"] == "weave"
+          assert data["project"]["dependencies"] == [], "运行期依赖必须为空"
+          print("pyproject OK")
+          PY
+          python -c "import weave; print('weave', weave.__version__)"
+
+      - name: 核心零第三方依赖（源码扫描）
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys
+          # 权威标准库清单（Python 3.10+），不要手写白名单
+          stdlib = set(sys.stdlib_module_names)
+          bad = []
+          for path in sorted(pathlib.Path("weave").rglob("*.py")):
+              if "__pycache__" in path.parts:
+                  continue
+              for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                  mods = []
+                  if isinstance(node, ast.Import):
+                      mods = [a.name for a in node.names]
+                  elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                      mods = [node.module]
+                  for mod in mods:
+                      root = mod.split(".")[0]
+                      if root == "weave" or root in stdlib:
+                          continue
+                      bad.append(f"{path}: {mod}")
+          assert not bad, "weave 出现了第三方依赖：" + "; ".join(bad)
+          print("zero third-party deps: OK")
+          PY

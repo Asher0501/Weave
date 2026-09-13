@@ -1,0 +1,20 @@
+# weave.yaml — DX 装配描述（I5：描述之一，非唯一来源）
+llm:
+  provider: openai_compatible        # openai_compatible | fake（离线）
+  model: ${WEAVE_MODEL:-gpt-4o-mini}
+  # api_key_env: OPENAI_API_KEY      # 不设则取 OPENAI_API_KEY / DEEPSEEK_API_KEY
+  retry:
+    max_attempts: 3
+    backoff: 2.0
+    overall_timeout: 120
+
+store:
+  backend: sqlite                    # memory | sqlite（init 骨架默认 sqlite：开箱跨 run 记忆）
+  sqlite_path: ./data/memory.db
+
+agent:
+  id: default
+  # system_prompt: prompts/system.md  # 未设则用内置最小 system
+
+loop:
+  max_iterations: 10

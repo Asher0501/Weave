@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="900" viewBox="0 0 1320 900"
+     font-family="Segoe UI, Microsoft YaHei, PingFang SC, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/><stop offset="55%" stop-color="#111a36"/><stop offset="100%" stop-color="#090d19"/>
+    </linearGradient>
+    <linearGradient id="biz" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b08cff" stop-opacity="0.22"/><stop offset="100%" stop-color="#b08cff" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="atom" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4fe3c1" stop-opacity="0.22"/><stop offset="100%" stop-color="#4fe3c1" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="impl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.09"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
+    </linearGradient>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9dc1ff"/>
+    </marker>
+    <style>
+      .t{fill:#eaf0ff}.d{fill:#bcc9e8}.m{fill:#8ea3c8}
+      .h{font-size:15px;font-weight:700}.l{font-size:13px}.s{font-size:11.5px}
+      .tag{font-size:11px;font-weight:700;letter-spacing:1.3px}
+      .chip{fill:#ffffff;fill-opacity:0.07;stroke:#ffffff;stroke-opacity:0.16}
+    </style>
+  </defs>
+  <rect width="1320" height="900" fill="url(#bg)"/>
+
+  <text x="46" y="48" class="t" font-size="23" font-weight="700">视图 A · 逻辑分解（谁拥有什么 · 无时间语义）</text>
+  <text x="46" y="72" class="m" font-size="13">回答"有哪些件、谁依赖谁、归谁所有"；顺序/循环/重试时机/并发一律不在本视图（见视图 B）</text>
+
+  <!-- business units -->
+  <text x="46" y="108" class="tag" fill="#c9b0ff">业务能力单元（单 agent 的最基础动作单元）</text>
+
+  <rect x="46" y="120" width="404" height="186" rx="16" fill="url(#biz)" stroke="#b08cff" stroke-opacity="0.5"/>
+  <text x="66" y="148" class="t h">会话管理</text>
+  <text x="66" y="174" class="d l">· Provider 调用与输入输出管理</text>
+  <text x="66" y="196" class="d l">· 单次动作可靠性（内部事务）：超时 / 重试 / 错误分类</text>
+  <text x="66" y="218" class="d l">· 流式聚合 · usage</text>
+  <rect x="66" y="232" width="364" height="60" rx="10" class="chip"/>
+  <text x="80" y="253" class="m s">可靠性在"单个动作内部"解决 → 对外不暴露时序语义</text>
+  <text x="80" y="273" class="m s">多动作之间的重试时机/并发 = 编排层（视图 B）</text>
+
+  <rect x="462" y="120" width="404" height="186" rx="16" fill="url(#biz)" stroke="#b08cff" stroke-opacity="0.5"/>
+  <text x="482" y="148" class="t h">记忆管理</text>
+  <text x="482" y="174" class="d l">· namespace 解析与约定（scope → namespace）</text>
+  <text x="482" y="196" class="d l">· append / tail(n) / 裁剪 / TTL</text>
+  <text x="482" y="218" class="d l">· 检索与摘要策略（可选能力）</text>
+  <text x="482" y="240" class="d l">· 按 namespace 选址（多库路由）</text>
+  <rect x="482" y="252" width="364" height="40" rx="10" class="chip"/>
+  <text x="496" y="277" class="m s">只读写 Database 原子；不做模型调用、不做流程</text>
+
+  <rect x="878" y="120" width="396" height="186" rx="16" fill="url(#biz)" stroke="#b08cff" stroke-opacity="0.5"/>
+  <text x="898" y="148" class="t h">解析执行</text>
+  <text x="898" y="174" class="d l">· Parser：把模型输出解码为结构化调用</text>
+  <text x="898" y="196" class="d l">· Executor：调用环境（handler / HTTP / 进程）</text>
+  <text x="898" y="218" class="d l">· 返回值 / 类型化失败（供上层回填）</text>
+  <rect x="898" y="232" width="356" height="60" rx="10" class="chip"/>
+  <text x="912" y="253" class="m s">Parser 消费 schema（来自引擎），不拥有 schema</text>
+  <text x="912" y="273" class="m s">不含"何时执行、执行几次"（属编排层）</text>
+
+  <!-- arrows business -> atoms -->
+  <line x1="248" y1="306" x2="248" y2="352" stroke="#9dc1ff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="664" y1="306" x2="664" y2="352" stroke="#9dc1ff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="1000" y1="306" x2="1000" y2="352" stroke="#9dc1ff" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="1140" y1="306" x2="1140" y2="352" stroke="#9dc1ff" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- atomic interfaces -->
+  <text x="46" y="348" class="tag" fill="#7ff0d6">原子接口（契约 · 零策略 · 零第三方依赖）</text>
+  <rect x="46" y="360" width="404" height="150" rx="16" fill="url(#atom)" stroke="#4fe3c1" stroke-opacity="0.7" stroke-width="2"/>
+  <text x="66" y="388" class="t h">LLM Provider</text>
+  <text x="66" y="414" class="d l">complete(messages, schema, …) → response</text>
+  <text x="66" y="436" class="d l">stream(…) → chunks</text>
+  <text x="66" y="462" class="m s">纯协议/格式适配；单次；失败即抛</text>
+  <text x="66" y="484" class="m s">不重试、不计时、不分类（那些属会话管理）</text>
+
+  <rect x="462" y="360" width="404" height="150" rx="16" fill="url(#atom)" stroke="#4fe3c1" stroke-opacity="0.7" stroke-width="2"/>
+  <text x="482" y="388" class="t h">Database（通用 KV）</text>
+  <text x="482" y="414" class="d l">get / set / delete / append / list(ns, key)</text>
+  <text x="482" y="440" class="m s">namespace 视为不透明字符串；纯读写</text>
+  <text x="482" y="462" class="m s">不做重试 / 裁剪 / TTL / 解析策略</text>
+  <text x="482" y="484" class="m s">历史→ConversationLog；检索→Search（D11/D12）</text>
+
+  <rect x="878" y="360" width="186" height="150" rx="16" fill="url(#atom)" stroke="#4fe3c1" stroke-opacity="0.7" stroke-width="2"/>
+  <text x="896" y="388" class="t h">Parser</text>
+  <text x="896" y="414" class="d l">解析模型输出</text>
+  <text x="896" y="436" class="d l">→ 结构化调用</text>
+  <text x="896" y="462" class="m s">消费 schema（来自 EC）</text>
+  <text x="896" y="484" class="m s">唯一的解码者（含 DSML）</text>
+
+  <rect x="1076" y="360" width="198" height="150" rx="16" fill="url(#atom)" stroke="#4fe3c1" stroke-opacity="0.7" stroke-width="2"/>
+  <text x="1094" y="388" class="t h">Executor</text>
+  <text x="1094" y="414" class="d l">执行调用</text>
+  <text x="1094" y="436" class="d l">→ 返回值/失败</text>
+  <text x="1094" y="462" class="m s">环境域归属</text>
+  <text x="1094" y="484" class="m s">schema 见 EC 接口</text>
+
+  <!-- engine / environment schema interface -->
+  <rect x="1076" y="524" width="198" height="96" rx="12" class="chip"/>
+  <text x="1090" y="548" class="d l">环境能力目录</text>
+  <text x="1090" y="570" class="m s">describe() →</text>
+  <text x="1090" y="588" class="m s">[ToolSchema]</text>
+  <text x="1090" y="609" class="m s">（独立接口 D10）</text>
+  <line x1="1175" y1="510" x2="1175" y2="524" stroke="#7ff0d6" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="1076" y="646" class="m s">留成接口：环境可远端化</text>
+
+  <!-- impl -->
+  <line x1="248" y1="510" x2="248" y2="552" stroke="#7ff0d6" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="664" y1="510" x2="664" y2="552" stroke="#7ff0d6" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="970" y1="510" x2="970" y2="552" stroke="#7ff0d6" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="46" y="560" class="tag" fill="#9dc1ff">参考实现（可替换）</text>
+
+  <rect x="46" y="572" width="404" height="104" rx="14" fill="url(#impl)" stroke="#ffffff" stroke-opacity="0.16"/>
+  <text x="66" y="598" class="d l">OpenAI 兼容 · Anthropic · 网关 · 第三方 SDK</text>
+  <text x="66" y="622" class="m s">实现 Provider 原子（不含重试/超时）</text>
+  <text x="66" y="646" class="m s">→ 单测：协议映射、错误透传</text>
+
+  <rect x="462" y="572" width="404" height="104" rx="14" fill="url(#impl)" stroke="#ffffff" stroke-opacity="0.16"/>
+  <text x="482" y="598" class="d l">KV：InMemory · SQLite · Redis</text>
+  <text x="482" y="622" class="m s">KV 实现 + 日志 SqliteConversationLog</text>
+  <text x="482" y="646" class="m s">→ 单测：CRUD、并发语义、追加不退化</text>
+
+  <rect x="878" y="668" width="396" height="104" rx="14" fill="url(#impl)" stroke="#ffffff" stroke-opacity="0.16"/>
+  <text x="898" y="694" class="d l">解析器：原生 tool_calls / DSML / JSON</text>
+  <text x="898" y="718" class="d l">执行器：Python handler / HTTP / 进程</text>
+  <text x="898" y="742" class="m s">实现 Parser / Executor 原子</text>
+
+  <!-- invariants -->
+  <rect x="46" y="800" width="1228" height="72" rx="12" class="chip"/>
+  <text x="66" y="824" class="d l">本视图不变量：① 原子接口不依赖业务单元；② 业务单元不依赖彼此的实现（会话↔记忆↔解析执行之间不直接调用）；</text>
+  <text x="66" y="846" class="d l">③ schema 归引擎（EnvironmentCatalog）且作为独立接口暴露；④ 会话历史归 ConversationLog（只增不改）；⑤ 检索归上下文域（只承诺「问题→相关记录」）；⑥ 会话管理的重试/超时是"单动作内部事务"，不构成时序依赖；</text>
+  <text x="66" y="866" class="m s">⑦ 替换任一原子实现（Provider / Database / ConversationLog / Search / Parser / Executor / EnvironmentCatalog），业务单元与其上层测试必须仍绿。</text>
+</svg>

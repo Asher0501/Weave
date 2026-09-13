@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="900" viewBox="0 0 1320 900"
+     font-family="Segoe UI, Microsoft YaHei, PingFang SC, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/><stop offset="55%" stop-color="#111a36"/><stop offset="100%" stop-color="#090d19"/>
+    </linearGradient>
+    <linearGradient id="orch" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcf6e" stop-opacity="0.22"/><stop offset="100%" stop-color="#ffcf6e" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="unit" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b08cff" stop-opacity="0.20"/><stop offset="100%" stop-color="#b08cff" stop-opacity="0.05"/>
+    </linearGradient>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9dc1ff"/>
+    </marker>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ffd79a"/>
+    </marker>
+    <style>
+      .t{fill:#eaf0ff}.d{fill:#bcc9e8}.m{fill:#8ea3c8}.n{fill:#ffd79a}
+      .h{font-size:15px;font-weight:700}.l{font-size:13px}.s{font-size:11.5px}
+      .tag{font-size:11px;font-weight:700;letter-spacing:1.3px}
+      .chip{fill:#ffffff;fill-opacity:0.07;stroke:#ffffff;stroke-opacity:0.16}
+      .life{stroke:#ffffff;stroke-opacity:0.18;stroke-dasharray:5 6}
+    </style>
+  </defs>
+  <rect width="1320" height="900" fill="url(#bg)"/>
+
+  <text x="46" y="48" class="t" font-size="23" font-weight="700">视图 B · 时序 / 编排（多模块交互 · 更高层 · 另一领域）</text>
+  <text x="46" y="72" class="m" font-size="13">回答"时间上怎么交互"；只调用视图 A 的动作单元，不改变其逻辑分解</text>
+
+  <!-- orchestration -->
+  <rect x="46" y="94" width="1228" height="150" rx="16" fill="url(#orch)" stroke="#ffcf6e" stroke-opacity="0.55"/>
+  <text x="66" y="122" class="tag" fill="#ffd79a">编排层（归属：业务/调用方；如 agora 的 relay）</text>
+  <text x="66" y="150" class="d l">· 多轮循环与停止判定　· 何时取上下文　· 何时发起解析/执行　· 观察如何回填</text>
+  <text x="66" y="174" class="d l">· 跨动作的重试时机与退避　· 并发/串行选择　· 中断与恢复　· 事件顺序与发布</text>
+  <text x="66" y="198" class="d l">· 多 Agent/多模组之间的协调（选谁、给谁什么上下文、如何收敛）</text>
+  <text x="66" y="224" class="m s">判据：**跨动作、跨模组**的交互 → 本层；weave 不内置默认循环</text>
+
+  <!-- participants -->
+  <rect x="120" y="274" width="300" height="74" rx="14" fill="url(#unit)" stroke="#b08cff" stroke-opacity="0.5"/>
+  <text x="140" y="302" class="t h">记忆管理</text>
+  <text x="140" y="326" class="m s">tail / append（ConversationLog）· 裁剪（Database）</text>
+
+  <rect x="460" y="274" width="360" height="74" rx="14" fill="url(#unit)" stroke="#b08cff" stroke-opacity="0.5"/>
+  <text x="480" y="302" class="t h">会话管理</text>
+  <text x="480" y="326" class="m s">内部：Provider + 重试/超时/分类（单动作事务）</text>
+
+  <rect x="860" y="274" width="360" height="74" rx="14" fill="url(#unit)" stroke="#b08cff" stroke-opacity="0.5"/>
+  <text x="880" y="302" class="t h">解析执行</text>
+  <text x="880" y="326" class="m s">Parser（消费 schema）→ Executor（调环境）</text>
+
+  <!-- external env -->
+  <rect x="1100" y="596" width="200" height="64" rx="12" class="chip"/>
+  <text x="1116" y="620" class="d l">外部环境</text>
+  <text x="1116" y="642" class="m s">handler / HTTP / 进程</text>
+
+  <!-- lifelines -->
+  <line x1="270" y1="348" x2="270" y2="764" class="life"/>
+  <line x1="640" y1="348" x2="640" y2="764" class="life"/>
+  <line x1="1040" y1="348" x2="1040" y2="764" class="life"/>
+
+  <!-- 1 orchestration -> memory tail -->
+  <line x1="356" y1="268" x2="270" y2="392" stroke="#ffd79a" stroke-width="2" marker-end="url(#ar2)"/>
+  <text x="286" y="386" class="n s">① tail(scope)：取上下文</text>
+  <!-- 2 memory -> orchestration (dashed) -->
+  <line x1="290" y1="410" x2="372" y2="252" stroke="#9dc1ff" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#ar)"/>
+  <text x="300" y="436" class="m s">② 历史消息（返回编排层）</text>
+
+  <!-- 3 orchestration -> session call -->
+  <line x1="700" y1="268" x2="640" y2="452" stroke="#ffd79a" stroke-width="2" marker-end="url(#ar2)"/>
+  <text x="656" y="446" class="n s">③ call(messages, schema)：一次动作</text>
+
+  <!-- 4 session internal retry (self loop) -->
+  <path d="M640 470 C 600 486, 600 512, 640 528" fill="none" stroke="#4fe3c1" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="470" y="506" class="m s">④ 会话管理内部：重试 / 超时 / 错误分类</text>
+  <text x="470" y="524" class="m s">（单个动作内部事务 → 编排层不感知）</text>
+
+  <!-- 5 session -> orchestration response -->
+  <line x1="700" y1="556" x2="372" y2="252" stroke="#9dc1ff" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#ar)"/>
+  <text x="706" y="558" class="m s">⑤ response / 类型化失败</text>
+
+  <!-- 6 orchestration -> parse/execute -->
+  <line x1="760" y1="268" x2="1040" y2="596" stroke="#ffd79a" stroke-width="2" marker-end="url(#ar2)"/>
+  <text x="900" y="430" class="n s">⑥ parse(response, schema) → invocation</text>
+
+  <!-- 7 parse -> external -->
+  <line x1="1040" y1="620" x2="1100" y2="620" stroke="#9dc1ff" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="1046" y="612" class="m s">⑦ execute</text>
+  <!-- 8 external -> parse -->
+  <line x1="1180" y1="660" x2="1040" y2="684" stroke="#9dc1ff" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#ar)"/>
+  <text x="1046" y="700" class="m s">⑧ 返回值 / 类型化失败</text>
+
+  <!-- 9 parse -> orchestration observation -->
+  <line x1="1040" y1="720" x2="820" y2="252" stroke="#9dc1ff" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#ar)"/>
+  <text x="826" y="736" class="m s">⑨ observation 回编排层</text>
+
+  <!-- 10 orchestration -> memory append -->
+  <line x1="270" y1="392" x2="356" y2="268" stroke="#ffd79a" stroke-width="2" marker-end="url(#ar2)"/>
+  <text x="120" y="748" class="n s">⑩ append(轮次/观察) · 编排层决定"再来一轮 / 输出"</text>
+
+  <!-- note strip -->
+  <rect x="46" y="786" width="1228" height="86" rx="12" class="chip"/>
+  <text x="66" y="810" class="d l">判据：① 单个动作"内部"的问题（等多久、要不要抛、怎么分类、如何聚合）→ 会话管理自解；</text>
+  <text x="66" y="832" class="d l">② 跨动作 / 跨模组的交互（要不要再做一次、换谁做、并发几个、何时回填、何时停）→ 编排层；</text>
+  <text x="66" y="854" class="m s">③ 本层是"另一领域"：它只使用视图 A 的动作单元与原子接口，不反向污染其逻辑分解（无反向 import）。</text>
+</svg>

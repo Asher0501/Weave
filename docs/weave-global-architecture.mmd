@@ -1,0 +1,57 @@
+%% Weave 架构（现状）— mermaid 源码
+%% 用途：贴进 mermaid 编辑器面板 / https://mermaid.live
+%% 形态：weave 只做一件事（LLM 交互）——一个输入、一个输出；
+%%       上下文、执行、循环都由应用自己组装。详见 docs/weave-llm-dimension.md
+flowchart TB
+  subgraph APP["① 应用 / 业务（外部）—— 编排与组合都在这里"]
+    A1["自己决定：上下文从哪来（文本 / 数据库 / 关键词）"]
+    A2["自己决定：工具怎么执行（bash / 脚本 / HTTP）"]
+    A3["自己决定：循环几轮、什么时候停"]
+  end
+
+  subgraph OBJ["② weave.llm(...) —— LLM 交互（weave 唯一功能）"]
+    ASM["装配：weave.llm(model=…) 用默认 provider<br/>weave.llm(provider=…) 注入自己的"]
+    IN["输入：messages（+ 可选 tools / 本次动作参数）"]
+    REL["reliability：超时 · 重放 · 退避 · 限流(Retry-After) · 取消 · 错误分类"]
+    DEC["decode：原生 tool_calls / DSML / JSON 兜底 → 统一调用结构"]
+    USE["usage：各厂商字段归一 + 对象级累计"]
+    OBS["observer：注入回调（默认不上报；自身不写日志、不埋点）"]
+    OUT["输出：LLMResponse<br/>content / tool_calls / usage / attempts / elapsed_ms"]
+  end
+
+  subgraph ATOM["③ LLMProvider 实现（哑原子 · 可替换 · 不进兼容承诺）"]
+    P1["OpenAIHTTPProvider（零第三方依赖 + 可注入 transport + 自带 SSE 解析）"]
+    P2["FakeProvider（离线确定性，测试用）"]
+    P3["一次调用，失败即抛；协议适配 / 认证端点 / 参数差异过滤；可靠性不在这里"]
+  end
+
+  subgraph CORE["契约与词汇（weave.core）—— ②③ 两侧共用的词表，不是栈里的一级"]
+    C1["不依赖任何 weave 模块（I=0.00，最稳定）"]
+    C2["接口：LLMProvider（模型）· StateStore（KV）"]
+    C3["词汇：Message · ToolCall · ToolSchema · LLMResponse · StreamChunk · Invocation"]
+    C4["信封：CallRequest · TypedFailure"]
+    C5["纪律：改动 = 基变换 —— ②③ 必须同步改，替换测试全绿"]
+  end
+
+  subgraph PARK["⑤ 已归档（archive/v0.4-parked/ · 不是删除）"]
+    K1["legacy provider（openai_compat + _reliability + adapter，419 行）"]
+    K2["会话日志 · 检索 · 执行器 · 环境目录 · 组装策略 · trace/checkpoint · Redis 存储"]
+    K3["demos/atomic · 5 个测试文件 · 6 份旧文档/图"]
+  end
+
+  A1 --> IN
+  A2 --> IN
+  A3 --> IN
+  ASM --> IN
+  IN --> REL
+  REL --> DEC
+  DEC --> USE
+  USE --> OUT
+  OBS -.-> REL
+  REL --> P1
+  DEC --> P1
+  P1 --> P2
+  OUT --> A1
+  %% 两侧都只依赖词表；词表不依赖任何 weave 模块
+  OBJ --> CORE
+  ATOM --> CORE

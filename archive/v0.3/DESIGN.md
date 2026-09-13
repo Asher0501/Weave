@@ -1,5 +1,7 @@
 # Weave — Design Document
 
+> ⚠️ **v0.4 注意**：本文档是 **v0.3 代码**的设计真相源。v0.4 已决议「全新定义」为薄组件库（包名 `weave`），其先验体系见 **`docs/v0.4/01-principles.md`**；本文与先验冲突之处（如 §1 定位、Loop/Memory 叙事）以 v0.4 为准，扩散矩阵见 `docs/v0.4/README.md`。
+
 ## 1. 项目定位
 
 **Weave** 是一个非侵入式、基于 SDK 的 Agent 插件框架。它为任意 Python 项目提供**最基础的 Loop（循环）和 Memory（记忆）机制**，并以 SDK 的形式对外提供服务。

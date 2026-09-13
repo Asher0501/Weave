@@ -9,6 +9,8 @@ description: Weave 项目的规范驱动开发（SDD）SKILL。基于 DESIGN.md 
 
 ## 核心原则
 
+> ⚠️ **v0.4 注意**：涉及 v0.4「全新定义」的工作，唯一真相源是 `docs/v0.4/01-principles.md`（DESIGN.md 仅约束 v0.3 代码），冲突处以 v0.4 先验为准；本技能下文命名映射仍为 v0.3，实现期按 v0.4 更新。
+
 1. **DESIGN.md 是唯一真相源** — 所有代码必须对齐 DESIGN.md 中的接口、类型、命名
 2. **docs/issues/ 是决策记录** — 涉及 async/sync、memory 模型、事件总线等设计取舍时，必须先读对应的 issue
 3. **Phase 有序推进** — 按 DESIGN.md §10 路线图的 Phase 顺序实现，先核心后 Feature
