@@ -1,6 +1,6 @@
 # Weave — Design Document
 
-> ⚠️ **v0.4 注意**：本文档是 **v0.3 代码**的设计真相源。v0.4 已决议「全新定义」为薄组件库（包名 `weave`），其先验体系见 **`docs/v0.4/01-principles.md`**；本文与先验冲突之处（如 §1 定位、Loop/Memory 叙事）以 v0.4 为准，扩散矩阵见 `docs/v0.4/README.md`。
+> ⚠️ **v0.4 注意**：本文档是 **v0.3 代码**的设计真相源。v0.4 已决议「全新定义」为薄组件库（包名 `weave`），其先验体系见 **`archive/v0.4-parked/docs-v0.4/01-principles.md`**；本文与先验冲突之处（如 §1 定位、Loop/Memory 叙事）以 v0.4 为准，扩散矩阵见 `archive/v0.4-parked/docs-v0.4/README.md`。
 
 ## 1. 项目定位
 

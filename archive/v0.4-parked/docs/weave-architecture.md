@@ -4,7 +4,7 @@
 
 > 原则：**weave 只交付原子件**；组合（循环/上下文/Agent/工具绑定/装配）是调用方代码。
 > 本图与 `weave/` 实际代码一一对应；命名零约定（namespace/key 由调用方定义）。
-> 相关：`docs/v0.4/01-principles.md`（先验）、`docs/v0.4/02-architecture.md`（契约细节）。
+> 相关：`archive/v0.4-parked/docs-v0.4/01-principles.md`（先验）、`archive/v0.4-parked/docs-v0.4/02-architecture.md`（契约细节）。
 
 ## 0. 一图看全
 

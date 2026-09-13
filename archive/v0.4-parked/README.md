@@ -53,6 +53,21 @@ weave 被收缩成**一个功能**：LLM 交互（`weave.llm(...)`，一个输�
 `agora.adapter.repository` / `agora.atoms` / `agora.relay` 仍可正常导入（它们只用
 `weave.stores.sqlite` 与 `weave.core.types`）。
 
+### 第三批（文档与图收敛）
+
+门面文档（`README.md` / `docs/weave-*.md`）改为**只描述 weave 现在有的东西**，
+被移出的"归档清单 / 迁移映射 / 决策状态"整体存进 `retired-scope.md`（保留，不展示）：
+
+| 归档内容 | 原来在哪 | 为什么移出 |
+|---|---|---|
+| `retired-scope.md` | `docs/weave-llm-dimension.md` §5/§6 · `docs/weave-global-architecture.md` §3/§4 | 门面文档不列已归档能力与历史决策 |
+| `renderers/render_architecture_{png,ascii}.py` | `scripts/` | 画的是含"已归档能力"那一版的图 |
+| `renderers/weave-global-architecture.{png,mmd}` | `docs/` | 同上（旧图第④栏列的就是已归档能力） |
+| `docs-v0.4/` | `docs/v0.4/` | "原子组件库"时期的设计基线与 agora 迁移报告 |
+
+现由零依赖的 `scripts/render_design_svg.py` 产出两张 SVG：
+`docs/weave-design-philosophy.svg`（设计哲学）· `docs/weave-global-architecture.svg`（架构）。
+
 ## 重要提醒
 
 **归档代码不保证可直接运行**：它们 import 的契约（`Database` / `ConversationLog` /
@@ -67,6 +82,8 @@ weave 被收缩成**一个功能**：LLM 交互（`weave.llm(...)`，一个输�
 
 ## 参考
 
-- 当前架构：`docs/weave-global-architecture.md`
+- 当前架构：`docs/weave-global-architecture.md`（图：`docs/weave-global-architecture.svg`）
+- 设计哲学：`docs/weave-design-philosophy.svg`
 - LLM 交互维度规格与验收清单：`docs/weave-llm-dimension.md`
+- 从门面文档移出的归档清单 / 迁移映射 / 决策状态：`retired-scope.md`
 - 契约面门禁（防止这些能力悄悄长回来）：`tests/v04/test_contracts.py`

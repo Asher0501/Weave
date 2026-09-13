@@ -14,7 +14,14 @@ from typing import Any
 from weave.core.envelopes import CallRequest, TypedFailure, classify_exception
 from weave.core.errors import WeaveError
 from weave.core.interfaces import LLMProvider
-from weave.core.types import LLMResponse, Message, StreamChunk, ToolCall, ToolSchema
+from weave.core.types import (
+    LLMResponse,
+    Message,
+    StreamChunk,
+    ToolCall,
+    ToolSchema,
+    payload_content,
+)
 from weave.llm.decode import AutoDecoder, DecodeResult, decode_tool_calls
 from weave.llm.reliability import ReliabilityPolicy, emit_event, run_with_reliability
 from weave.llm.streaming import StreamAccumulator
@@ -35,7 +42,12 @@ class LLMCallError(WeaveError):
 
 
 class LLMClient:
-    """一次 LLM 交互（可并发使用；配置只在构造器与实例属性）。"""
+    """一次 LLM 交互（可并发使用；配置只在构造器与实例属性）。
+
+    对象层**不认识任何厂商**：厂商知识全在适配器（provider）里。适配器可选地声明
+    `protocol` / `foreign_block_types` / `block_shape_hint` 三个类属性，对象层据此
+    在**发请求之前**做一次"错家形状"预检（见 `_check_vendor_shape`）。
+    """
 
     def __init__(
         self,
@@ -46,6 +58,7 @@ class LLMClient:
         decoder: AutoDecoder | None = None,
         strict_decode: bool = True,
         default_opts: dict[str, Any] | None = None,
+        shape_check: bool = True,
     ) -> None:
         self.provider = provider
         self.policy = policy or ReliabilityPolicy()
@@ -53,6 +66,7 @@ class LLMClient:
         self.decoder = decoder or AutoDecoder()
         self.strict_decode = strict_decode
         self.default_opts = dict(default_opts or {})
+        self.shape_check = shape_check
         #: 对象级累计用量（H3；应用可读，不参与语义）
         self.usage: dict[str, int] = {}
         self.calls = 0
@@ -265,12 +279,52 @@ class LLMClient:
     ) -> CallRequest:
         if isinstance(messages, Message):
             messages = [messages]
+        for message in messages:
+            # 只校验、不改写：用法错误（原样块里混进非 dict、原样块与 tool_calls 的歧义、
+            # 别家形状的块）必须在进入可靠性重放之前抛出——否则会被 classify_exception
+            # 归成可重试的 `server`，白白退避重放 3 次再把编程错误报成厂商故障。
+            content = payload_content(message)
+            if self.shape_check and isinstance(content, list):
+                self._check_vendor_shape(content)
         merged = {**self.default_opts, **opts}
         return CallRequest(
             messages=list(messages),
             schemas=list(tools or []),
             opts=merged,
         )
+
+    def _check_vendor_shape(self, blocks: list[dict[str, Any]]) -> None:
+        """错家形状预检：**厂商知识来自适配器，对象层不认识任何厂商**。
+
+        适配器可选声明三个类属性：
+
+        - `protocol`：本适配器的厂商名（只用于报错信息）；
+        - `foreign_block_types`：明确属于**别家**的块类型，遇到即拒；
+        - `block_shape_hint`：本厂商正确形状的示例（只用于报错信息）。
+
+        两条纪律：
+
+        1. **只拦别家已知形状**，未知块一律放行——否则预检会变成挡厂商新特性的墙，
+           而"能接厂商未来新增的块"正是放开原样形态的全部意义；
+        2. 可用 `weave.llm(..., shape_check=False)` 整个关掉（确实有网关吃混合形状）。
+
+        注入的 provider 不声明 `foreign_block_types` 时，本预检自动跳过。
+        """
+        foreign = getattr(self.provider, "foreign_block_types", None)
+        if not foreign:
+            return
+        protocol = getattr(self.provider, "protocol", "") or type(self.provider).__name__
+        hint = getattr(self.provider, "block_shape_hint", "")
+        for block in blocks:
+            kind = block.get("type")
+            if kind in foreign:
+                raise TypeError(
+                    f"Message.content 里出现了别家形状的块 {kind!r}，但当前适配器是 {protocol}"
+                    f"（配置来自 weave.llm(protocol=...)）。"
+                    + (f"{protocol} 的写法示例：{hint}。" if hint else "")
+                    + "换成本厂商的块形状，或把 protocol 改成对应协议；"
+                    "若该网关确实接受混合形状，可传 shape_check=False 关掉本检查。"
+                )
 
     async def _notify(self, event: str, data: dict[str, Any]) -> None:
         """上报（I1–I4）：只有一条通道——注入的回调；回调异常不得影响主流程。"""

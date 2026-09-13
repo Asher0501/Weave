@@ -15,10 +15,27 @@ from typing import Any
 
 @dataclass(slots=True)
 class Message:
-    """LLM 对话消息（LLM 面往返的原子单位）。"""
+    """LLM 对话消息（LLM 面往返的原子单位）。
+
+    `content` 有两种形态：
+
+    - **`str`（语义形态，推荐）**：provider 按厂商要求替你包成内容块，跨厂商可移植。
+    - **`dict` / `list[dict]`（原样形态）**：weave **不解释任何 key**，逐字写进该角色的
+      内容槽位。这是接厂商独有能力的唯一入口（多模态、`cache_control`、thinking 块回传、
+      厂商新增的任意块类型），代价是这些内容**只对当前厂商有效，换 provider 不可移植**。
+
+    原样形态的两条纪律（唯一的校验，见 `payload_content`）：
+
+    1. 每个元素必须是 dict —— weave 不看里面的 key，但拒绝非 dict 的杂物；
+    2. 原样 `content` 与 `tool_calls` 同时给出是**歧义**，直接 `TypeError`：
+       要么自己把 `tool_use` 块写进 content，要么只用 `tool_calls`。
+
+    注：`role="tool"` 的原样 `content` 是 `tool_result` **内层**内容
+    （所以工具返回一张图也能表达）；其它角色的原样 `content` 就是内容数组本身。
+    """
 
     role: str  # "system" | "user" | "assistant" | "tool"
-    content: str = ""
+    content: str | dict[str, Any] | list[dict[str, Any]] = ""
     name: str | None = None            # role="tool" 时的工具名
     tool_call_id: str | None = None    # role="tool" 时关联的 tool_call.id
     tool_calls: list["ToolCall"] | None = None  # role="assistant" 时的调用请求
@@ -46,6 +63,35 @@ class ToolSchema:
     parameters: dict[str, Any] = field(default_factory=dict)  # JSON Schema object
 
 
+def payload_content(message: Message) -> str | list[dict[str, Any]]:
+    """`Message.content` → 厂商 payload 内容槽位的值（两种形态的**唯一定义处**）。
+
+    - `str` → 原样返回（provider 自己包块）；
+    - `dict` → 视作单块，包成 `[dict]`；
+    - `list[dict]` → **浅拷贝后原样透传**（不解释 key，不排序，不改写）。
+
+    非法输入与歧义在这里一次性拒绝（`TypeError`），不让它流到厂商那里变成难查的 400。
+    """
+    content = message.content
+    if isinstance(content, str):
+        return content
+    blocks: Any = [content] if isinstance(content, dict) else content
+    if not isinstance(blocks, list):
+        raise TypeError(
+            "Message.content 只能是 str，或 dict / list[dict]（原样形态）；"
+            f"收到 {type(content).__name__}"
+        )
+    bad = sorted({type(block).__name__ for block in blocks if not isinstance(block, dict)})
+    if bad:
+        raise TypeError(f"Message.content 的原样块必须是 dict，收到：{bad}")
+    if message.tool_calls:
+        raise TypeError(
+            "Message.content 已是原样块数组，就不要再给 tool_calls（歧义）："
+            "把 tool_use 块自己写进 content，或者 content 用 str、只用 tool_calls"
+        )
+    return [dict(block) for block in blocks]
+
+
 # ── Provider 产出 ───────────────────────────────────────
 
 
@@ -68,6 +114,11 @@ class LLMResponse:
     elapsed_ms: float = 0.0            # 这个动作的总耗时（含退避）
     failure: Any | None = None         # TypedFailure | None（仅"部分成功"时出现）
     raw: dict[str, Any] | None = None  # 厂商原始响应片段，排查用
+    #: 厂商**原始内容块数组**（未解释、未丢块）。厂商返回的 text/thinking/tool_use 之外的块
+    #: （多模态、`server_tool_use` 等）只会出现在这里；把它原样回填成
+    #: `Message(role="assistant", content=resp.raw_blocks)` 即可让下一轮无损续接
+    #: （extended thinking 要求 thinking 块随 tool_use 一起回传，就靠这条闭环）。
+    raw_blocks: list[dict[str, Any]] | None = None
 
 
 @dataclass(slots=True)

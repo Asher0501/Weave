@@ -44,6 +44,11 @@ class LLMProvider(ABC):
     - **不得解析工具调用语法**：`LLMResponse.tool_calls` 保持厂商原样，
       解码是对象的职责（`weave.llm.decode`）；
     - 推理内容（`reasoning`）绝不隐式回传后续请求。
+
+    适配器**可选自述**（对象层据此在发请求前做"错家形状"预检；**不是接口的一部分**，
+    不声明就跳过 —— 注入自己的哑原子时无需实现）：`protocol`（厂商名）·
+    `foreign_block_types`（明确属于别家的块类型，遇到即拒，未知块一律放行）·
+    `block_shape_hint`（本厂商正确形状示例，仅用于报错信息）。
     """
 
     @abstractmethod

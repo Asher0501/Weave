@@ -1,6 +1,6 @@
 # Weave — 基础事实与约束
 
-> ⚠️ **v0.4 注意**：本文档是 **v0.3 代码**的红线宪法。v0.4「全新定义」以 **`docs/v0.4/01-principles.md`** 为准；与本文冲突的条款（§1 不做 Multi-Agent / 只做 Loop+Memory、§5 公开 API 不可变、§6 R7 配置唯一来源、§7 默认 SQLite、R2 prompt 零硬编码等）已被 v0.4 先验**覆盖或精化**，扩散矩阵见 `docs/v0.4/README.md`。
+> ⚠️ **v0.4 注意**：本文档是 **v0.3 代码**的红线宪法。v0.4「全新定义」以 **`archive/v0.4-parked/docs-v0.4/01-principles.md`** 为准；与本文冲突的条款（§1 不做 Multi-Agent / 只做 Loop+Memory、§5 公开 API 不可变、§6 R7 配置唯一来源、§7 默认 SQLite、R2 prompt 零硬编码等）已被 v0.4 先验**覆盖或精化**，扩散矩阵见 `archive/v0.4-parked/docs-v0.4/README.md`。
 
 > 任何基于事实来更新本项目的会话，**必须先读取本文档**。
 >

@@ -24,7 +24,7 @@ from typing import Any
 from weave.core.envelopes import CallRequest
 from weave.core.errors import ProviderError, classify_http_error
 from weave.core.interfaces import LLMProvider
-from weave.core.types import LLMResponse, Message, StreamChunk, ToolCall, ToolSchema
+from weave.core.types import LLMResponse, Message, StreamChunk, ToolCall, ToolSchema, payload_content
 from weave.providers.sse import iter_sse_events
 from weave.providers.transport import (
     HTTPResponse,
@@ -38,6 +38,7 @@ __all__ = [
     "AnthropicHTTPProvider",
     "build_anthropic_payload",
     "messages_to_anthropic",
+    "join_system",
     "tools_to_anthropic",
     "parse_anthropic_message",
     "anthropic_event_to_chunks",
@@ -66,16 +67,20 @@ _STOP_REASON = {
 # ── 纯函数：请求构造 ────────────────────────────────────
 
 
-def messages_to_anthropic(messages: Sequence[Message]) -> tuple[str | None, list[dict[str, Any]]]:
+def messages_to_anthropic(
+    messages: Sequence[Message],
+) -> tuple[str | list[dict[str, Any]] | None, list[dict[str, Any]]]:
     """`Message[]` → `(system, messages)`。
 
-    三处协议差异都在这里处理：
-    1. `system` 抽出来当顶层参数（多条 system 用空行拼）；
+    四处协议差异都在这里处理：
+    1. `system` 抽出来当顶层参数（多条 str 用空行拼；**任一条是原样块数组时整体用块数组**，
+       这样长 system 上打 `cache_control` 缓存断点也表达得出来）；
     2. `assistant.tool_calls` → `tool_use` 内容块；
     3. `role="tool"` → `user` 消息里的 `tool_result` 块，且**相邻的合并进同一条 user 消息**
-       （Anthropic 要求 tool_result 跟在 tool_use 之后，不能拆成多条 user）。
+       （Anthropic 要求 tool_result 跟在 tool_use 之后，不能拆成多条 user）；
+    4. `content` 是原样形态（dict / list[dict]）时**逐字透传**，weave 不看 key。
     """
-    system_parts: list[str] = []
+    raw_system: list[Any] = []
     out: list[dict[str, Any]] = []
 
     def push(message: dict[str, Any]) -> None:
@@ -91,9 +96,10 @@ def messages_to_anthropic(messages: Sequence[Message]) -> tuple[str | None, list
         out.append(message)
 
     for message in messages:
+        content = payload_content(message)      # 原样形态在这里归一；歧义在这里报错
         if message.role == "system":
-            if message.content:
-                system_parts.append(message.content)
+            if content:
+                raw_system.append(content)
             continue
         if message.role == "tool":
             push({
@@ -101,14 +107,14 @@ def messages_to_anthropic(messages: Sequence[Message]) -> tuple[str | None, list
                 "content": [{
                     "type": "tool_result",
                     "tool_use_id": message.tool_call_id or "",
-                    "content": message.content,
+                    "content": content,          # str，或原样块数组（工具返回图片等）
                 }],
             })
             continue
         if message.role == "assistant" and message.tool_calls:
             blocks: list[dict[str, Any]] = []
-            if message.content:
-                blocks.append({"type": "text", "text": message.content})
+            if content:
+                blocks.append({"type": "text", "text": content})
             for call in message.tool_calls:
                 arguments = call.arguments
                 if isinstance(arguments, str):
@@ -124,9 +130,25 @@ def messages_to_anthropic(messages: Sequence[Message]) -> tuple[str | None, list
                 })
             push({"role": "assistant", "content": blocks})
             continue
-        push({"role": message.role, "content": message.content})
+        push({"role": message.role, "content": content})
 
-    return ("\n\n".join(system_parts) or None), out
+    return join_system(raw_system), out
+
+
+def join_system(parts: Sequence[Any]) -> str | list[dict[str, Any]] | None:
+    """多条 system 合一条顶层参数：全是 str → 空行拼接（老行为）；出现原样块 → 块数组。"""
+    if not parts:
+        return None
+    if all(isinstance(part, str) for part in parts):
+        return "\n\n".join(parts)
+    blocks: list[dict[str, Any]] = []
+    for part in parts:
+        if isinstance(part, str):
+            if part:
+                blocks.append({"type": "text", "text": part})
+        else:
+            blocks.extend(part)
+    return blocks
 
 
 def tools_to_anthropic(schemas: Sequence[ToolSchema]) -> list[dict[str, Any]] | None:
@@ -198,7 +220,11 @@ def build_anthropic_payload(
 
 
 def parse_anthropic_message(body: str) -> LLMResponse:
-    """非流式响应 → LLMResponse（`tool_use.input` 已是对象，不做解码）。"""
+    """非流式响应 → LLMResponse（`tool_use.input` 已是对象，不做解码）。
+
+    **不丢块**：text/thinking/tool_use 之外的块（多模态、`server_tool_use` …）原样留在
+    `LLMResponse.raw_blocks` 里，回填成下一轮的 `Message.content` 即可无损续接。
+    """
     data = json.loads(body or "{}")
     blocks = data.get("content") or []
     text = "".join(b.get("text") or "" for b in blocks if b.get("type") == "text")
@@ -210,6 +236,7 @@ def parse_anthropic_message(body: str) -> LLMResponse:
         for b in blocks if b.get("type") == "tool_use"
     ]
     stop_reason = data.get("stop_reason")
+    kept = [dict(b) for b in blocks if isinstance(b, dict)]
     return LLMResponse(
         content=text,
         reasoning=thinking or None,
@@ -218,6 +245,7 @@ def parse_anthropic_message(body: str) -> LLMResponse:
         usage=data.get("usage") or {},        # 字段已是 input_tokens / output_tokens，对象层会归一
         finish_reason=_STOP_REASON.get(stop_reason, stop_reason or "stop"),
         raw={"id": data.get("id"), "type": data.get("type")},
+        raw_blocks=kept or None,
     )
 
 
@@ -318,6 +346,15 @@ def anthropic_event_to_chunks(
 
 class AnthropicHTTPProvider(LLMProvider):
     """经 HTTP 调用 Anthropic 原生 Messages API（含兼容端点）。"""
+
+    #: ── 适配层自述（对象层据此做"错家形状"预检；不认识任何厂商细节）──
+    protocol = "anthropic"
+    #: 明确属于**别家**的块类型（只列对方独有的，未知块一律放行）
+    foreign_block_types = frozenset({
+        "image_url", "input_audio", "input_text", "input_image", "output_text",
+    })
+    #: 本厂商正确形状的示例（只用于报错信息）
+    block_shape_hint = '{"type":"image","source":{"type":"base64","media_type":…,"data":…}}'
 
     def __init__(
         self,

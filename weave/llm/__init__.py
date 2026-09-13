@@ -139,6 +139,7 @@ def llm(
     # ── 解码与观测 ──
     observer: Any = None,
     strict_decode: bool = True,
+    shape_check: bool = True,
     decoder: AutoDecoder | None = None,
     **default_opts: Any,
 ) -> LLMClient:
@@ -167,6 +168,9 @@ def llm(
         respect_retry_after: 是否尊重厂商的 Retry-After。
         observer: 事件回调（同步/异步皆可；默认不上报）。
         strict_decode: True 时结构损坏的解码直接报 parse_error；False 时跳过该条。
+        shape_check: True（默认）时，适配器会按**配置选定的厂商**在发请求前拦掉
+            "别家形状的块"（例如把 OpenAI 的 `image_url` 块发给 Anthropic 适配器）；
+            **只拦别家已知形状，未知块一律放行**。确实有网关吃混合形状时设为 False。
         **default_opts: 每次调用都会带的默认参数（如 max_tokens / temperature）。
     """
     if provider is not None and model is not None:
@@ -207,5 +211,6 @@ def llm(
         observer=observer,
         decoder=decoder,
         strict_decode=strict_decode,
+        shape_check=shape_check,
         default_opts=default_opts,
     )

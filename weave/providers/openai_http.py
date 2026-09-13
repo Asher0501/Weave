@@ -17,7 +17,7 @@ from typing import Any
 from weave.core.envelopes import CallRequest
 from weave.core.errors import ProviderError, classify_http_error
 from weave.core.interfaces import LLMProvider
-from weave.core.types import LLMResponse, Message, StreamChunk, ToolCall, ToolSchema
+from weave.core.types import LLMResponse, Message, StreamChunk, ToolCall, ToolSchema, payload_content
 from weave.providers.sse import iter_sse_events
 from weave.providers.transport import (
     HTTPResponse,
@@ -33,6 +33,7 @@ __all__ = [
     "messages_to_payload",
     "tools_to_payload",
     "filter_sampling_params",
+    "content_text",
     "parse_completion",
     "delta_to_chunks",
     "error_from_response",
@@ -57,10 +58,12 @@ def messages_to_payload(messages: Sequence[Message]) -> list[dict[str, Any]]:
 
     - `assistant.tool_calls` 按 OpenAI 形状回传；`tool` 消息必带 `tool_call_id`（A2）
     - `Message` 结构里没有 reasoning 字段 → 推理内容天然不回传（A4）
+    - `content` 是原样形态（dict / list[dict]）时**逐字透传**：weave 不看 key，
+      所以 `image_url` / `cache_control` / 厂商新块都能直接用（代价见 Message 文档）
     """
     out: list[dict[str, Any]] = []
     for message in messages:
-        entry: dict[str, Any] = {"role": message.role, "content": message.content}
+        entry: dict[str, Any] = {"role": message.role, "content": payload_content(message)}
         if message.role == "assistant" and message.tool_calls:
             entry["tool_calls"] = [
                 {
@@ -171,6 +174,22 @@ def error_from_response(response: HTTPResponse) -> ProviderError:
     return error
 
 
+def content_text(raw: Any) -> str:
+    """OpenAI 的 `content` 可能是 str，也可能是内容块数组（多模态 / 工具返回）。
+
+    数组形态里只取文本块拼成 `content`，**其余块不丢**——它们进 `LLMResponse.raw_blocks`。
+    """
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        return "".join(
+            part.get("text") or ""
+            for part in raw
+            if isinstance(part, dict) and part.get("type") in (None, "text", "output_text")
+        )
+    return ""
+
+
 def parse_completion(body: str) -> LLMResponse:
     """非流式响应 → LLMResponse（**不解码**工具参数，原样保留字符串）。"""
     data = json.loads(body or "{}")
@@ -186,14 +205,21 @@ def parse_completion(body: str) -> LLMResponse:
             arguments=function.get("arguments"),      # 原样：字符串交给对象层解码（D13）
         ))
 
+    raw_content = message.get("content")
+    raw_blocks = (
+        [dict(part) for part in raw_content if isinstance(part, dict)]
+        if isinstance(raw_content, list) else None
+    ) or None
+
     return LLMResponse(
-        content=message.get("content") or "",
+        content=content_text(raw_content),
         reasoning=message.get("reasoning_content") or message.get("reasoning"),
         tool_calls=tool_calls or None,
         model=data.get("model") or "",
         usage=data.get("usage") or {},
         finish_reason=choice.get("finish_reason") or "stop",
         raw={"id": data.get("id"), "created": data.get("created")},
+        raw_blocks=raw_blocks,
     )
 
 
@@ -235,6 +261,17 @@ def delta_to_chunks(data: dict[str, Any]) -> list[StreamChunk]:
 
 class OpenAIHTTPProvider(LLMProvider):
     """经 HTTP 调用任何 OpenAI 兼容端点（OpenAI / DeepSeek / 各类网关）。"""
+
+    #: ── 适配层自述（对象层据此做"错家形状"预检；不认识任何厂商细节）──
+    protocol = "openai"
+    #: 明确属于**别家**的块类型（只列对方独有的，未知块一律放行）
+    foreign_block_types = frozenset({
+        "image", "document", "tool_use", "tool_result", "thinking", "redacted_thinking",
+        "server_tool_use", "web_search_tool_result", "mcp_tool_use", "mcp_tool_result",
+        "search_result", "container_upload",
+    })
+    #: 本厂商正确形状的示例（只用于报错信息）
+    block_shape_hint = '{"type":"image_url","image_url":{"url": …}}'
 
     def __init__(
         self,

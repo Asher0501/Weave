@@ -4,6 +4,65 @@
 v0.3 及更早的记录见 [`archive/v0.3/CHANGELOG.md`](archive/v0.3/CHANGELOG.md)——
 v0.4 是**全新定义**，不背 v0.3 兼容包袱。
 
+## [未发布]
+
+**主题：让 `Message` 能承载厂商独有的内容块（原样透传）——零新增契约词汇。**
+
+### Added
+
+- **适配层"错家形状"预检**：适配器（provider）可选自述三个类属性
+  `protocol` / `foreign_block_types` / `block_shape_hint`——**不是接口的一部分**，不声明就跳过。
+  对象层据此在**发请求之前**拦掉"把 OpenAI 的 `image_url` 块发给 Anthropic 适配器"这类错误，
+  报错里直接给出当前厂商的正确写法与出路（换形状 / 换 `protocol` / `shape_check=False`）。
+  两条纪律：只拦别家**已知**形状，**未知块一律放行**（不挡厂商新特性）；
+  `weave.llm(..., shape_check=False)` 可整体关掉。`Message` 依旧不感知任何厂商。
+- **两张设计图（SVG）**：`docs/weave-design-philosophy.svg`（先验 · 判决规则 · 哑原子/聪明对象 ·
+  core 是词表 · 两种内容形态 · 不许静默）与 `docs/weave-global-architecture.svg`
+  （应用 → 对象 → 厂商适配层 + 契约词表），由**零依赖**的 `scripts/render_design_svg.py`
+  生成（手写 XML，自带 CJK 宽度排版自校验，溢出即非零退出）。
+- **`Message.content` 除 `str` 外接受 `dict` / `list[dict]`**：weave **不解释任何 key**，
+  逐字写进该角色的内容槽位。
+  - 多模态（`{"type":"image",…}` / `{"type":"image_url",…}`）、`cache_control` 缓存断点、
+    厂商未来新增的任意块，都走这一个口子——不改 weave、不新增契约名字（仍是 2 接口 / 4 信封）。
+  - `role="tool"` 的原样 content 是 `tool_result` **内层**内容 → 工具可以返回图片。
+  - system 含原样块时，Anthropic 顶层 `system` 改用块数组 → 长 system 上可打缓存断点。
+- **`LLMResponse.raw_blocks`**：保留厂商**原始内容块数组**，text/thinking/tool_use 之外的块不再被丢弃。
+  原样回填成下一轮 `Message(role="assistant", content=resp.raw_blocks)` 即闭环
+  （extended thinking 要求 thinking 块随 `tool_use` 一起回传，靠这条才成立）。
+
+### Changed
+
+- OpenAI 响应的 `content` 是数组时，按文本块拼接进 `LLMResponse.content`，其余块进 `raw_blocks`
+  （原先数组会被直接塞进 `content: str` 字段，类型与语义都不对）。
+- **用法错误提前到发请求之前**：原样块里混入非 dict、或原样 `content` 与 `tool_calls` 同时给出，
+  现在在 `LLMClient._request` 阶段就 `TypeError`。此前这类错误会在 provider 里抛出，被
+  `classify_exception` 归成**可重试**的 `server`——白白退避重放 3 次，还把编程错误报成厂商故障。
+- `messages_to_anthropic` 的返回值放宽为 `(str | list[dict] | None, list[dict])`（system 可为块数组）。
+
+### 文档与图（同步收敛）
+
+- **门面文档只描述 weave 现在有的东西**：`README.md` / `docs/weave-*.md` 里移除
+  "已归档能力清单 / 迁移映射 / 决策状态表 / 未来维度预告"，以及坏掉的消费者指向（agora）
+  与历史设计基线入口（`docs/v0.4/`）。被移除的内容**归档保留**，不删除：
+  `archive/v0.4-parked/retired-scope.md`。
+- 旧的图与渲染脚本一并归档到 `archive/v0.4-parked/renderers/`
+  （`render_architecture_{png,ascii}.py` · `weave-global-architecture.{png,mmd}`）——
+  它们画的是含"已归档能力"那一版的图；`docs/v0.4/` → `archive/v0.4-parked/docs-v0.4/`；
+  `demos/`（agora 演示脚本）→ `archive/v0.4-parked/demos/`。归档文档内的路径引用已同步修正。
+- `docs/weave-llm-dimension.md`：原 §4「非目标」表 → 收敛为三条式「边界」（判据一句话 +
+  在这/不在这）；§5「与其它能力的边界」与 §6「代码去留映射」移出；验收数字更新为 174 passed。
+
+### Verified
+
+- 离线测试 **174 passed**（143 原有 + 24 块透传 + 7 适配层预检）：透传规则 · 歧义拒绝 ·
+  两个 provider 双向 · thinking 块回填闭环 · 错家形状预检（含"未知块放行"与"可关"）·
+  预检先于重放 · 对象层不改写内容 · 契约面未增长。
+
+### 代价（明确写下来）
+
+- 原样块是**厂商形状**：只对当前厂商有效、**换 provider 不可移植**；`str` 形态才跨厂商。
+  「替换测试」（换 provider 调用方零改动）因此只在 `str` 路径上成立。
+
 ## [0.4.0] - 2026-09-13
 
 **主题：收缩为单一功能 —— 「LLM 交互」（一个输入、一个输出）。**

@@ -1,7 +1,7 @@
 # demos/forum — agora(14_forum) × weave v0.4 测试脚本
 
 前置：agora 已**全量运行于 weave v0.4**（LLM + Repository 均已迁移，见
-`docs/v0.4/demo-forum/MIGRATION-REPORT.md`），运行时不再需要 v0.3 归档包。
+`archive/v0.4-parked/docs-v0.4/demo-forum/MIGRATION-REPORT.md`），运行时不再需要 v0.3 归档包。
 脚本自动把 `13_weave` 与 `14_forum` 加入 `sys.path`/`PYTHONPATH`，从仓库根或任意目录运行均可。
 
 | 脚本 | 作用 | 命令 | 预期 |

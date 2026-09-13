@@ -1,9 +1,10 @@
 # weave 的「LLM 交互」维度 · 规格与完备清单
 
-> **定位**：weave 当前**只做这一个维度**。它对外**只有一个输入、一个输出**：
+> **定位**：weave 只做这一个维度。它对外**只有一个输入、一个输出**：
 > 输入 `messages`（+ 可选 `tools`），输出一次模型响应。
-> 上下文从哪来、要不要执行工具、循环几轮——**都是应用的自由**（见 §4 非目标）。
-> 其余能力（上下文管理 / 执行 / 编排）冻结为**未来维度**，现在不接入对象。
+> 上下文从哪来、要不要执行工具、循环几轮——**都是应用的自由**（判据见 §4）。
+>
+> 图：[设计哲学](weave-design-philosophy.svg) · [架构](weave-global-architecture.svg)
 
 ## 1. 对外形状
 
@@ -53,13 +54,17 @@ weave/llm/                     ← 对象层（本维度）
   decode.py      解码归一       原生 tool_calls / DSML / JSON → Invocation
   usage.py       计量归一       各厂商 usage 字段 → 统一口径
   streaming.py   流式聚合       增量 chunk → 完整响应（tool_calls 按 index 归并）
-weave/core/                     ← 契约层（本维度唯一的稳定面）
-  types.py · envelopes.py · errors.py · interfaces.LLMProvider
-weave/providers/                ← 哑原子参考实现（协议适配，不重试、不计时、不解码）
-  openai_http.py   OpenAIHTTPProvider（推荐；零第三方依赖，HTTP 走注入式 transport）
-  sse.py           SSE 半行缓冲 + 事件组装（F1/F2 的落点）
-  transport.py     可注入传输协议 + stdlib 实现（含跨分片 UTF-8 增量解码）
-  fake.py          离线确定性实现（测试）
+weave/core/                     ← 契约与词汇（②③ 共用的词表，不是栈里的一级）
+  types.py         Message / ToolCall / ToolSchema / LLMResponse / StreamChunk
+                   + payload_content()：str=语义形态 / dict·list[dict]=原样形态 的唯一定义处
+  envelopes.py     CallRequest / Invocation / TypedFailure + 失败分类（8 类）
+  errors.py        类型化错误；interfaces.py：LLMProvider · StateStore
+weave/providers/                ← 厂商适配层（哑原子：一次调用，失败即抛，不重试不计时不解码）
+  openai_http.py      OpenAIHTTPProvider（零第三方依赖，HTTP 走注入式 transport）
+  anthropic_http.py   AnthropicHTTPProvider（/v1/messages 原生协议）
+  sse.py              SSE 半行缓冲 + 事件组装（F1/F2 的落点）
+  transport.py        可注入传输协议 + stdlib 实现（含跨分片 UTF-8 增量解码）
+  fake.py             离线确定性实现（测试）
 ```
 
 分工铁律：**原子是哑的**（一次 HTTP/一次调用，失败即抛，不重试不计时）；
@@ -75,7 +80,15 @@ weave/providers/                ← 哑原子参考实现（协议适配，不�
 - [x] A2 `assistant.tool_calls` 回传格式正确；`tool` 消息必带 `tool_call_id`（V1）
 - [x] A3 厂商差异过滤：如 `deepseek-reasoner` 不接受 `temperature/top_p`（V1）
 - [x] A4 `reasoning` 内容**绝不回传**给下一次请求（V1）
-- [ ] A5 多模态内容（图片/音频）原样透传，不做解释（V2）
+- [x] A5 原样内容块（多模态 / 厂商独有块）逐字透传，weave **不解释任何 key**（原 V2，本轮实现；零新增词汇）
+- [x] A6 原样块与 `tool_calls` 同时给出视为歧义 → 在**发出任何请求之前** `TypeError`，
+      且**不得进入可靠性重放**（否则编程错误会被归成可重试的 `server` 并退避重放）（V1）
+- [x] A7 `role="tool"` 的原样 content 是 `tool_result` **内层**内容（工具可返回图片）；
+      system 出现原样块时顶层 `system` 用块数组（这样 `cache_control` 缓存断点可达）（V1）
+- [x] A8 适配层按**配置选定的厂商**拦"别家形状"的块：适配器可选自述 `protocol` /
+      `foreign_block_types` / `block_shape_hint`（三个类属性，**不是接口的一部分**，不声明则跳过），
+      对象层在**发请求之前**预检并给出本厂商的写法示例。只拦别家**已知**形状，
+      **未知块一律放行**（不挡厂商新特性）；`weave.llm(..., shape_check=False)` 可关（V1）
 
 ### B. 认证与端点
 - [x] B1 `api_key` / `base_url` 可由构造器给，也可从环境变量取（V1）
@@ -118,6 +131,9 @@ weave/providers/                ← 哑原子参考实现（协议适配，不�
 - [x] G4 三种都解不出 → 返回空列表，**不报错**（残留文本仍在 `content` 里）（V1）
 - [x] G5 结构损坏到无法继续（如 arguments 不是合法 JSON）→ `parse_error`（V1）
 - [x] G6 解码不改变输入（纯函数）；不执行任何动作（V1）
+- [x] G7 响应保留厂商**原始内容块**（`LLMResponse.raw_blocks`），text/thinking/tool_use 之外的块
+      **不丢**；原样回填成下一轮 `Message.content` 即闭环（extended thinking 要求 thinking 块
+      随 `tool_use` 回传，靠这条才成立）（V1）
 
 ### H. 计量
 - [x] H1 各厂商字段名归一：`prompt_tokens/completion_tokens/input_tokens/total_tokens`（V1）
@@ -147,48 +163,16 @@ weave/providers/                ← 哑原子参考实现（协议适配，不�
 - [x] L2 提供 `FakeProvider`（哑原子）用于对象层测试（V1）
 - [x] L3 换厂商实现（兼容/Anthropic/Fake）→ **对象层与应用零改动**（V1）
 
-## 4. 非目标（明确不做）
+## 4. 边界
 
-| 不做 | 归属 |
-|---|---|
-| 多轮循环、停止判定、工具往返、观察回填 | 应用的编排 |
-| 上下文组装、记忆读写、命名空间约定、检索 | **未来维度**（上下文管理） |
-| 工具执行（bash / 脚本 / HTTP） | 应用的执行 / **未来维度**（执行） |
-| 环境 schema 的描述与反射 | **未来维度**（执行） |
-| 模型选择策略、路由、成本择优 | 应用 |
-| 货币成本估算 | 注入的 observer |
-| 提示词模板 / 意图解析 | 应用 |
+判据一句话：**需要跨多次交互才成立的，都不在本维度。**
 
-## 5. 与其它能力的边界（已归档，不在对象里）
+- **在这**：一次交互内部的协议适配 · 可靠性（超时/重放/退避/限流/取消/分类）· 解码归一 ·
+  计量归一 · 流式聚合 · 可观测性回调。
+- **不在这**：多轮循环与停止判定 · 上下文组装与记忆 · 检索召回 · 工具执行 · 编排 ·
+  模型选择与路由 · 成本估算。这些是实现应用时的自由，weave 不提供、也不替调用方决定。
 
-| 已归档（`archive/v0.4-parked/`） | 原位置 | 为什么不在对象里 |
-|---|---|---|
-| `ConversationLog`（追加日志） | `weave/logs/` | 会话历史属应用 |
-| `Search`（检索） | `weave/search/` | 上下文从哪来属应用 |
-| `Executor` / `EnvironmentCatalog` | `weave/executors/`、`weave/catalogs/` | 执行与 schema 属应用 |
-| 组装策略 `MemoryAssembly` | `weave/strategy/` | 上下文拼装属应用 |
-| trace / checkpoint | `weave/capabilities/` | 无消费者 |
-| `RedisStateStore` · `core/codec.py` | `weave/stores/`、`weave/core/` | 无消费者 |
-| Agent / loop / context 示例 | `demos/atomic/` | 面向旧形态 |
-
-保留的是**真有消费者**的两样：`LLMProvider`（本维度契约）· `StateStore`（KV 存储）。
-取回归档能力的做法见 `archive/v0.4-parked/README.md`（要连同接口契约与测试一起取回）。
-
-## 6. 代码去留映射（本次调整）
-
-| 原位置 | 去向 | 原因 |
-|---|---|---|
-| `weave/parsers/*`（native/JSON/DSML） | 逻辑迁入 `weave/llm/decode.py` | 解码属于"读懂模型输出"，属于本维度（用户已确认） |
-| `weave/strategy/session.py`（重试/超时/分类） | 逻辑迁入 `weave/llm/reliability.py` | 单动作可靠性属于本维度 |
-| `weave/strategy/assembly.py` | 📦 归档 | 上下文拼装属应用 |
-| `weave/logs` · `weave/search` · `weave/executors` · `weave/catalogs` · `weave/capabilities` · `core/codec.py` · `stores/redis_store.py` · `demos/atomic` | 📦 归档（含各自测试） | 无真实消费者 |
-| `weave/core/interfaces.py` | 收缩为 **2 个**（`LLMProvider` · `StateStore`） | 契约面 = 有消费者的接口 |
-| `weave/core/envelopes.py` | 收缩为一套信封（请求/响应/增量/失败） | 未来维度用的 `Scope`/`Record`/`Context`… 已删除 |
-| `weave/providers/openai_compat.py` · `_reliability.py` · `adapter.py` | 📦 归档 | 只有 agora 在用；weave 保留一套零依赖实现 |
-| `weave/providers/openai_http.py`（新增） | 推荐使用的**哑** provider（零第三方依赖 + 注入式 transport） | A2/A3/B1–B3/E3 由它承担并离线验收 |
-| `weave/providers/sse.py` · `transport.py`（新增） | SSE 半行缓冲/事件组装 · 可注入 HTTP 传输 | F1/F2 的落点；不联网即可测协议适配 |
-
-## 7. 验收方式与证据
+## 5. 验收方式与证据
 
 ```bash
 python -m pytest tests/v04 -q        # 全离线（注入假 transport，不联网、不需要 API key）
@@ -196,17 +180,17 @@ python -m pytest tests/v04 -q        # 全离线（注入假 transport，不联�
 
 | 证据 | 结果 |
 |---|---|
-| 本维度离线测试 | **143 passed**（对象层 · 协议适配/SSE/传输 · 契约面与门禁） |
+| 本维度离线测试 | **174 passed**（对象层 · 协议适配/SSE/传输 · 内容块透传与适配层预检 · 契约面与门禁） |
 | 真实端点冒烟 | **已跑通**（见 §8） |
 | 替换测试 | 换 provider（`OpenAIHTTPProvider` ↔ `AnthropicHTTPProvider` ↔ `FakeProvider`）→ 对象层与应用零改动 |
 | 反向依赖门禁 | 源码扫描：原子层/`llm` 层不得出现编排或策略符号；`weave` 全包零第三方依赖 |
 | D13 边界门禁 | `weave/providers/*.py` 不得出现 `Invocation`（原子不解码） |
 | 端到端冒烟（离线） | `weave.llm(FakeProvider)` → `content / tool_calls / usage / attempts` 全部归一 |
 
-未勾选项只有 2 条，均为 **V2 非目标**（A5 多模态透传 · H5 货币成本估算），
-已在 §4 明确归属（应用 / 注入的 observer）。
+未勾选项只有 1 条：**H5 货币成本估算**（V2）—— 它需要价格表，归属注入的 observer，
+不属于"一次交互"。
 
-## 8. 真实端点实测记录
+## 6. 真实端点实测记录
 
 脚本：`scripts/smoke_real_llm.py`（只从环境变量或 `~/.claude/settings.json` 取凭证，
 **不打印 key**；把「原始响应」与「归一结果」并排输出，便于对照）。
