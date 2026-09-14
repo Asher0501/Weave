@@ -30,6 +30,6 @@ resp.content, resp.tool_calls, resp.usage
 
 from weave.llm import LLMClient, LLMCallError, coerce_provider, llm
 
-__version__ = "0.4.0.dev0"
+__version__ = "0.5.0"
 
 __all__ = ["llm", "coerce_provider", "LLMClient", "LLMCallError", "__version__"]
