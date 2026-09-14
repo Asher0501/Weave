@@ -64,6 +64,7 @@ weave 被收缩成**一个功能**：LLM 交互（`weave.llm(...)`，一个输�
 | `renderers/render_architecture_{png,ascii}.py` | `scripts/` | 画的是含"已归档能力"那一版的图 |
 | `renderers/weave-global-architecture.{png,mmd}` | `docs/` | 同上（旧图第④栏列的就是已归档能力） |
 | `docs-v0.4/` | `docs/v0.4/` | "原子组件库"时期的设计基线与 agora 迁移报告 |
+| `dx-smoke/` | `tests/v04/.work/cli_smoke/` | 旧 DX 时代（`weave.dx.builder`，该模块早已不存在）的示例工程，误提交进了测试的运行时临时目录。`.work/` 这类编译/运行产物现已进 `.gitignore` |
 
 现由零依赖的 `scripts/render_design_svg.py` 产出两张 SVG：
 `docs/weave-design-philosophy.svg`（设计哲学）· `docs/weave-global-architecture.svg`（架构）。
