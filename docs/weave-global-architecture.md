@@ -51,6 +51,8 @@ resp = await w.call(messages, tools=[...], max_tokens=2048)
 resp.content, resp.tool_calls, resp.usage, resp.finish_reason
 resp.attempts, resp.elapsed_ms          # 这个动作试了几次、花了多久
 resp.raw, resp.raw_blocks               # 厂商原始片段 / 原始内容块（不丢块）
+resp.as_message()                       # 回填 assistant（content + tool_calls）
+Message.tool_result(call, output)       # 回填工具结果（name / tool_call_id 自动对上）
 
 async for chunk in w.stream(messages): ...              # 只要增量（自行组装）
 resp = await w.call_streaming(messages, on_chunk=...)   # 流式 + 内部聚合

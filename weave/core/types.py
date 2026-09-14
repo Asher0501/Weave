@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -39,6 +40,25 @@ class Message:
     name: str | None = None            # role="tool" 时的工具名
     tool_call_id: str | None = None    # role="tool" 时关联的 tool_call.id
     tool_calls: list["ToolCall"] | None = None  # role="assistant" 时的调用请求
+
+    # ── 回填构造器：把"这次的结果"变成"下次的输入"（纯数据；不执行、不循环、不做策略）──
+
+    @staticmethod
+    def tool_result(call: "ToolCall", output: Any = "") -> "Message":
+        """构造工具结果消息（`role="tool"`），`name` / `tool_call_id` 自动取自 `call`。
+
+        这是工具往返里最容易写错的一步（`tool_call_id` 写错 → 厂商直接 400），所以只此一处：
+
+        - `output` 是 `str` → 原样（文本内容由调用方决定）；
+        - 其它可 JSON 序列化的值 → `json.dumps(..., ensure_ascii=False)`；
+          **不对 dict 做隐式结构解释**（那是厂商原样块的活，见类文档）；
+        - 不可序列化 → 让 `json.dumps` 抛 `TypeError`（不静默 `str()` 掉）；
+        - 工具要返回**图片等原样块**时不要用本方法，显式写
+          `Message(role="tool", content=[...块...], tool_call_id=call.id)`。
+        """
+        content = output if isinstance(output, str) else json.dumps(output, ensure_ascii=False)
+        return Message(role="tool", content=content, name=call.name,
+                       tool_call_id=call.id)
 
 
 @dataclass(slots=True)
@@ -119,6 +139,19 @@ class LLMResponse:
     #: `Message(role="assistant", content=resp.raw_blocks)` 即可让下一轮无损续接
     #: （extended thinking 要求 thinking 块随 tool_use 一起回传，就靠这条闭环）。
     raw_blocks: list[dict[str, Any]] | None = None
+
+    def as_message(self) -> Message:
+        """把这次响应回填成一条 `assistant` 消息（工具往返的"请求回填"那一步）。
+
+        与 `Message.tool_calls` 是**同一个类型**，所以不需要任何转换；漏掉这次回填，
+        下一轮 `role="tool"` 的 `tool_call_id` 就无处对应（Anthropic 会直接 400）。
+
+        给的是**语义形态**（`content` + `tool_calls`），跨厂商可移植。若这一轮用了厂商原样块
+        （如 extended thinking 要求 thinking 块随 `tool_use` 一起回传），要保留原始块请**显式**回填
+        `Message(role="assistant", content=resp.raw_blocks)`——本方法**不做隐式切换**：
+        那会静默改变可移植性，并与"原样块 + `tool_calls` 是歧义"的规则冲突。
+        """
+        return Message(role="assistant", content=self.content or "", tool_calls=self.tool_calls)
 
 
 @dataclass(slots=True)

@@ -35,6 +35,10 @@ resp.usage          # 已归一：{"input":n, "output":m, "total":k, "reasoning"
 resp.finish_reason  # "stop" | "tool_calls" | "length"
 resp.model
 
+# 回填（工具往返的两步；纯数据构造，不执行、不循环、不做策略）
+resp.as_message()                 # → assistant 消息（content + tool_calls）
+Message.tool_result(call, output) # → role="tool" 消息（name / tool_call_id 自动对上）
+
 # 流式：同一个动作的另一种呈现（可选）
 async for chunk in w.stream(messages, tools=[...]):
     ...

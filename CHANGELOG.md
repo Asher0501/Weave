@@ -20,6 +20,12 @@ v0.4 是**全新定义**，不背 v0.3 兼容包袱。
   core 是词表 · 两种内容形态 · 不许静默）与 `docs/weave-global-architecture.svg`
   （应用 → 对象 → 厂商适配层 + 契约词表），由**零依赖**的 `scripts/render_design_svg.py`
   生成（手写 XML，自带 CJK 宽度排版自校验，溢出即非零退出）。
+- **回填构造器**：`LLMResponse.as_message()` 与 `Message.tool_result(call, output)` ——
+  工具往返里最容易写错的两步（assistant 回填、`tool_call_id` 对应）从此各只有一处实现。
+  `tool_result` 对非 `str` 输出按 `json.dumps(ensure_ascii=False)` 序列化，不可序列化则抛 `TypeError`；
+  回填**厂商原样块**（extended thinking 的 thinking 块）仍显式写
+  `Message(role="assistant", content=resp.raw_blocks)`——**不做隐式切换**（那会静默改变可移植性）。
+  **契约面零新增**：只是既有类型上的方法，不加接口、不加导出、不动门禁。
 - **`Message.content` 除 `str` 外接受 `dict` / `list[dict]`**：weave **不解释任何 key**，
   逐字写进该角色的内容槽位。
   - 多模态（`{"type":"image",…}` / `{"type":"image_url",…}`）、`cache_control` 缓存断点、
@@ -54,9 +60,9 @@ v0.4 是**全新定义**，不背 v0.3 兼容包袱。
 
 ### Verified
 
-- 离线测试 **174 passed**（143 原有 + 24 块透传 + 7 适配层预检）：透传规则 · 歧义拒绝 ·
+- 离线测试 **180 passed**（143 原有 + 24 块透传 + 7 适配层预检 + 6 回填构造器）：透传规则 · 歧义拒绝 ·
   两个 provider 双向 · thinking 块回填闭环 · 错家形状预检（含"未知块放行"与"可关"）·
-  预检先于重放 · 对象层不改写内容 · 契约面未增长。
+  预检先于重放 · 对象层不改写内容 · 回填后的 id 在两个协议里都对得上 · 契约面未增长。
 
 ### 代价（明确写下来）
 

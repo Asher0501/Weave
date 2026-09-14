@@ -18,6 +18,27 @@
 | 厂商独有内容块 | `content` 除 `str` 外可直接给 `dict` / `list[dict]`，**原样逐字透传、不解释 key**（多模态、`cache_control`、厂商新块都不必改 weave）；响应侧保留原始块 `raw_blocks`，thinking 块可无损回填下一轮 |
 | 可观测性 | **注入的回调**（默认不上报）；对象自己不写日志、不埋点 |
 
+## 它省掉什么
+
+`weave.llm(...)` 底下约 2.6k 行实现 + 1.7k 行离线测试。省掉的是**这一层基础设施和它的边界测试**，
+**不是**你的应用逻辑：
+
+| 省掉的活 | 为什么自己写容易错 |
+|---|---|
+| **SSE 跨网络分片** | `data:` 行会被 TCP 切开；一个汉字被切在两个分片之间会解出乱码——**本地永远不错，线上偶发** |
+| **流式 `tool_calls` 归并** | 每个 chunk 只带 `arguments` 的片段，要按 index 拼；Anthropic 的 content block index 还是**稀疏**的（混着 text/thinking），不映射成密集 index 就会串位 |
+| **重试语义** | 哪 4 类能重放、哪 4 类绝对不能；退避必须加抖动；尊重 `Retry-After`；总预算封顶；**流中途失败绝不重放**（否则用户看到重复内容） |
+| **两套协议的形状差异** | system 顶层参数 · `tool_result` 必须紧跟 `tool_use` 且相邻合并 · `max_tokens` 必填 · `stop_reason` 名字不同 · reasoner 类模型不吃采样参数 |
+| **输出解码兜底** | 模型有时不吐原生 `tool_calls`，而是写成 DSML 或围栏 JSON 文本——不兜就是"偶发解析失败" |
+| **用量与失败口径** | `prompt_tokens`/`input_tokens`/`reasoning`/`cache_*` 各家写法归一；异常归一成 8 类失败，应用只 switch 一次 |
+| **离线验收** | 注入 `transport` 就能不联网验证"限流重放几次""分片切在汉字中间会怎样"——这套测试基建常比实现更贵 |
+
+**它不省的**：循环 · 停止判定 · 上下文与记忆 · 检索 · 工具执行 · 编排 —— 一行都不省，这是故意的；
+Batch / Files / Assistants 这类**范围外 API** 也不覆盖，要用就绕过 weave 直接用 SDK。
+
+**什么时候不该用它**：只有**一个**调用点 · **一家**厂商 · 不用流式 · 不做工具往返 · 不需要离线验证这些行为
+—— 那就直接用官方 SDK，更省。weave 回本的位置是：**流式 + 工具往返 + 第二家厂商 + 这些行为要能验收**。
+
 ## 它不做什么（故意的）
 
 多轮循环 · 上下文组装与记忆 · 检索召回 · 工具执行 · 编排 · 多 Agent 协调 —— **全部由调用方决定**。
@@ -52,6 +73,23 @@ async def main():
 
 asyncio.run(main())
 ```
+
+**工具往返**：weave 只把"模型想调什么"读成结构化请求，**执行与循环都是你的**；回填那两步有构造器，
+免得手抄 id：
+
+```python
+resp = await w.call(messages, tools=tools)
+
+while resp.finish_reason == "tool_calls":
+    messages.append(resp.as_message())                                # 回填 assistant（content + tool_calls）
+    for call in resp.tool_calls:
+        messages.append(Message.tool_result(call, my_execute(call)))  # name / tool_call_id 自动对上
+    resp = await w.call(messages, tools=tools)                        # 轮数上限与停止判定由你决定
+```
+
+`tool_result(call, output)`：`output` 是 `str` 就原样，其它值按 `json.dumps(ensure_ascii=False)` 序列化，
+不可序列化则抛 `TypeError`。要回填**厂商原样块**（如 extended thinking 的 thinking 块）请显式写
+`Message(role="assistant", content=resp.raw_blocks)`——这两个构造器**不做隐式切换**。
 
 **凭证**：`api_key=` 显式传入，或走环境变量 —— OpenAI 兼容协议用
 `WEAVE_API_KEY` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY`；Anthropic 协议用

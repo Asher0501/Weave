@@ -86,4 +86,5 @@ weave 被收缩成**一个功能**：LLM 交互（`weave.llm(...)`，一个输�
 - 设计哲学：`docs/weave-design-philosophy.svg`
 - LLM 交互维度规格与验收清单：`docs/weave-llm-dimension.md`
 - 从门面文档移出的归档清单 / 迁移映射 / 决策状态：`retired-scope.md`
+- 封装空间的评审与触发条件（决定记录，不入 docs）：`encapsulation-review.md`
 - 契约面门禁（防止这些能力悄悄长回来）：`tests/v04/test_contracts.py`

@@ -27,7 +27,16 @@ from weave.core.errors import (
     RateLimitError,
     ServerError,
 )
-from weave.core.types import LLMResponse, Message, StreamChunk, ToolCall, ToolSchema
+from weave.core.types import (
+    LLMResponse,
+    Message,
+    StreamChunk,
+    ToolCall,
+    ToolSchema,
+    payload_content,
+)
+from weave.providers.anthropic_http import messages_to_anthropic
+from weave.providers.openai_http import messages_to_payload
 
 
 # ── CallRequest ─────────────────────────────────────────
@@ -128,3 +137,61 @@ def test_classify_exception_mapping(exc, kind):
 def test_classify_preserves_message():
     failure = classify_exception(RateLimitError("慢一点"))
     assert "慢一点" in failure.message
+
+
+# ── 回填构造器：工具往返的"纯搬运"只有一处实现 ──────────
+
+
+def test_response_as_message_carries_content_and_tool_calls():
+    call = ToolCall(id="c1", name="get_weather", arguments={"city": "北京"})
+    response = LLMResponse(content="我来查一下", tool_calls=[call], finish_reason="tool_calls")
+    message = response.as_message()
+    assert message.role == "assistant"
+    assert message.content == "我来查一下"
+    assert message.tool_calls == [call]
+
+
+def test_response_as_message_with_empty_content_stays_a_valid_semantic_message():
+    call = ToolCall(id="c1", name="t", arguments={})
+    message = LLMResponse(tool_calls=[call]).as_message()
+    assert message.content == ""
+    assert payload_content(message) == ""          # str 形态 → 不触发"原样块 + tool_calls"歧义
+
+
+def test_tool_result_takes_name_and_id_from_the_call():
+    call = ToolCall(id="toolu_1", name="get_weather", arguments={})
+    message = Message.tool_result(call, "晴，24℃")
+    assert (message.role, message.content) == ("tool", "晴，24℃")
+    assert message.name == "get_weather"
+    assert message.tool_call_id == "toolu_1"
+
+
+def test_tool_result_serializes_non_string_output_as_json():
+    call = ToolCall(id="c1", name="t", arguments={})
+    assert Message.tool_result(call, {"城市": "北京", "温度": 24}).content == '{"城市": "北京", "温度": 24}'
+    assert Message.tool_result(call, [1, 2]).content == "[1, 2]"
+    assert Message.tool_result(call).content == ""        # 默认输出为空字符串（str 原样）
+
+
+def test_tool_result_rejects_non_serializable_output_loudly():
+    call = ToolCall(id="c1", name="t", arguments={})
+    with pytest.raises(TypeError):
+        Message.tool_result(call, object())
+
+
+def test_filled_back_messages_match_ids_in_both_protocols():
+    """两个构造器产出的消息，在两个协议里 id 都对得上——这就是它们存在的理由。"""
+    call = ToolCall(id="toolu_1", name="get_weather", arguments={"city": "北京"})
+    response = LLMResponse(tool_calls=[call], finish_reason="tool_calls")
+    messages = [
+        Message(role="user", content="北京天气"),
+        response.as_message(),
+        Message.tool_result(call, {"temp": 24}),
+    ]
+
+    _, anthropic = messages_to_anthropic(messages)
+    assert anthropic[1]["content"][0]["type"] == "tool_use"
+    assert anthropic[1]["content"][0]["id"] == anthropic[2]["content"][0]["tool_use_id"]
+
+    openai = messages_to_payload(messages)
+    assert openai[1]["tool_calls"][0]["id"] == openai[2]["tool_call_id"] == "toolu_1"
