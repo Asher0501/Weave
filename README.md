@@ -174,33 +174,39 @@ while resp.finish_reason == "tool_calls":
 装配细节（`headers` / `transport` / `http_timeout` / `param_filter` / `extra_params`）都能从同一个
 `weave.llm(...)` 直接传，不必自己 new provider。
 
-**厂商独有的内容块**：`Message.content` 除了 `str`，还可以直接给 `dict` / `list[dict]` ——
-weave **不解释任何 key**，逐字写进该角色的内容槽位。厂商特有能力都走这一个口子，不必改 weave：
+**多模态 / 块级内容：写语义，不写形状。** `Message.content` 除 `str` 外接受**中立块**，
+厂商形状由适配层生成——所以同一份输入能喂给任何厂商：
 
 ```python
-from weave.core.types import Message
+from weave.core.types import Message, TextBlock, ImageBlock
 
-# 1) 图片（内容块形状按当前厂商给）
-resp = await w.call([Message(role="user", content=[
-    {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}},
-])])
+messages = [Message(role="user", content=[
+    TextBlock("这两张图有区别吗"),
+    ImageBlock(url="https://x/a.png"),                    # 远程图
+    ImageBlock(data=b64, media_type="image/png"),         # base64（不带 data: 前缀）
+])]
 
-# 2) 长 system 上打缓存断点（Anthropic：system 变成块数组）
-w2 = weave.llm(model="claude-sonnet-4-20250514", protocol="anthropic")
-messages = [
-    Message(role="system", content=[
-        {"type": "text", "text": long_prompt, "cache_control": {"type": "ephemeral"}},
-    ]),
-    Message(role="user", content="问题"),
-]
-
-# 3) 响应侧保留原始块 → 原样回填，thinking + tool_use 才能无损续接
-resp = await w2.call(messages, tools=tools)
-messages.append(Message(role="assistant", content=resp.raw_blocks))
+# → OpenAI    适配器发出 [{"type":"text",…}, {"type":"image_url","image_url":{"url":…}}]
+# → Anthropic 适配器发出 [{"type":"text",…}, {"type":"image","source":{…}}]
 ```
 
-代价必须知道：原样块是**厂商形状**，只对当前厂商有效、**换 provider 不可移植**（`str` 形态才跨厂商）。
-另外原样 `content` 与 `tool_calls` 同时给出是歧义，会在发出请求**之前**直接 `TypeError`，不会被当成厂商失败重放。
+`ImageBlock` 在**构造时**就校验（既无 `url` 也无 `data` / 两个都给 / base64 缺 `media_type` /
+带了 `data:` 前缀 → 立刻 `ValueError`），不用等厂商 400。`Block` 是**封闭集合**（只有 text / image），
+所以它不可能和工具调用撞车——`content=[TextBlock("我来查")]` 配 `tool_calls=[…]` 是合法的。
+
+**要厂商独有的东西时**（`cache_control`、thinking 块回传、厂商新块）：直接给 `dict` / `list[dict]`，
+weave **不解释任何 key**、逐字透传，代价是**换 provider 不可移植**：
+
+```python
+Message(role="system", content=[{"type": "text", "text": long_prompt,
+                                 "cache_control": {"type": "ephemeral"}}])   # Anthropic 私有
+
+resp = await w2.call(messages, tools=tools)
+messages.append(Message(role="assistant", content=resp.raw_blocks))          # thinking 无损回填
+```
+
+三种形态的纪律：同一个列表里**不能混用**中立块与厂商原样块（`TypeError`）；原样 `dict` 与
+`tool_calls` 同时给出是歧义（原样块可能本身就是工具调用）。
 
 **适配层会替你看着厂商**：配置里选定的协议决定哪些块形状合法，写错家会在发请求前报错，并给出当前厂商的写法：
 
@@ -245,8 +251,8 @@ python -m pytest tests/v04 -q      # 全离线：注入假 transport，不联网
 
 | 文档 | 内容 |
 |---|---|
-| [`docs/weave-design-philosophy.svg`](docs/weave-design-philosophy.svg) | **设计哲学图**：先验 · 判决规则 · 哑原子/聪明对象 · core 是词表 · 两种内容形态 · 不许静默 |
-| [`docs/weave-global-architecture.svg`](docs/weave-global-architecture.svg) | **架构图**：应用 → 对象 → 厂商适配层，右侧是 ②③ 共用的词表 |
+| [`docs/weave-design-philosophy.svg`](docs/weave-design-philosophy.svg) | **设计哲学图**：先验 · 判决规则 · 哑原子/聪明对象 · core 是词表 · 三种输入形态 · 不许静默 |
+| [`docs/weave-global-architecture.svg`](docs/weave-global-architecture.svg) | **架构图**：四段（应用 → 对象层 → 适配层 → 厂商）+ 两张收齐表（词表 · 守则） |
 | [`docs/weave-global-architecture.md`](docs/weave-global-architecture.md) | 架构说明 · 对外 API · 不变量与门禁 |
 | [`docs/weave-llm-dimension.md`](docs/weave-llm-dimension.md) | 本维度**规格与逐条验收清单**（完备清单 = 验收标准）+ 真实端点实测记录 |
 

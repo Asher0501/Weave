@@ -284,7 +284,9 @@ class LLMClient:
             # 别家形状的块）必须在进入可靠性重放之前抛出——否则会被 classify_exception
             # 归成可重试的 `server`，白白退避重放 3 次再把编程错误报成厂商故障。
             content = payload_content(message)
-            if self.shape_check and isinstance(content, list):
+            # 只查「厂商原样块」（中立块 Block 由适配层翻译，不是厂商形状）
+            if self.shape_check and isinstance(content, list) and content \
+                    and isinstance(content[0], dict):
                 self._check_vendor_shape(content)
         merged = {**self.default_opts, **opts}
         return CallRequest(

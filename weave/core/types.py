@@ -11,6 +11,41 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+# ── 内容块（厂商中立的**语义**，不是厂商形状） ──────────
+
+
+@dataclass(frozen=True, slots=True)
+class TextBlock:
+    """一段文本。"""
+
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class ImageBlock:
+    """一张图：给 `url`（远程），或 `data` + `media_type`（base64，**不含 `data:` 前缀**）。
+
+    构造时就校验 —— 不合法立刻 `ValueError`，不让它在发请求时才变成厂商的 400。
+    """
+
+    url: str | None = None
+    data: str | None = None
+    media_type: str | None = None
+
+    def __post_init__(self) -> None:
+        if bool(self.url) == bool(self.data):
+            raise ValueError("ImageBlock 必须且只能给一个：url，或 data（+ media_type）")
+        if self.data and not self.media_type:
+            raise ValueError("ImageBlock 用 data（base64）时必须给 media_type，如 'image/png'")
+        if self.data and self.data.startswith("data:"):
+            raise ValueError("ImageBlock.data 只放 base64 本身，不要带 'data:…;base64,' 前缀")
+
+
+#: 厂商中立内容块 —— **封闭集合**（当前只有文本与图片）。封闭带来两个好处：
+#: 写错类型在 IDE/构造时就报；且它永远不可能和 `tool_calls` 撞车（所以两者可以共存）。
+Block = TextBlock | ImageBlock
+
+
 # ── 消息与工具 ──────────────────────────────────────────
 
 
@@ -18,25 +53,28 @@ from typing import Any
 class Message:
     """LLM 对话消息（LLM 面往返的原子单位）。
 
-    `content` 有两种形态：
+    `content` 有三种形态：
 
-    - **`str`（语义形态，推荐）**：provider 按厂商要求替你包成内容块，跨厂商可移植。
-    - **`dict` / `list[dict]`（原样形态）**：weave **不解释任何 key**，逐字写进该角色的
-      内容槽位。这是接厂商独有能力的唯一入口（多模态、`cache_control`、thinking 块回传、
-      厂商新增的任意块类型），代价是这些内容**只对当前厂商有效，换 provider 不可移植**。
+    - **`str`（纯文本，最常用）**：provider 按厂商要求包成文本块，跨厂商可移植。
+    - **`Block` / `list[Block]`（中立块，多模态推荐）**：`TextBlock("…")` / `ImageBlock(url=…)`
+      —— 你写的是**语义**，形状由适配层生成，所以同一份输入能喂给任何厂商。
+    - **`dict` / `list[dict]`（原样形态）**：weave **不解释任何 key**，逐字写进该角色的内容槽位。
+      这是接厂商独有能力的入口（`cache_control`、thinking 块回传、厂商新块），代价是这些内容
+      **只对当前厂商有效，换 provider 不可移植**。
 
-    原样形态的两条纪律（唯一的校验，见 `payload_content`）：
+    三条纪律（唯一定义处见 `payload_content`）：
 
-    1. 每个元素必须是 dict —— weave 不看里面的 key，但拒绝非 dict 的杂物；
-    2. 原样 `content` 与 `tool_calls` 同时给出是**歧义**，直接 `TypeError`：
-       要么自己把 `tool_use` 块写进 content，要么只用 `tool_calls`。
+    1. 列表里**不能混用**中立块与厂商原样块（语义不明 → `TypeError`）；
+    2. 原样 `content` 与 `tool_calls` 同时给出是**歧义**（原样块可能本身就是工具调用）→ `TypeError`；
+       中立块与 `tool_calls` 可以共存——`Block` 是封闭集合，只含 text / image；
+    3. 原样块每个元素必须是 dict —— weave 不看里面的 key，但拒绝非 dict 的杂物。
 
-    注：`role="tool"` 的原样 `content` 是 `tool_result` **内层**内容
-    （所以工具返回一张图也能表达）；其它角色的原样 `content` 就是内容数组本身。
+    注：`role="tool"` 的内容是 `tool_result` **内层**内容（所以工具返回一张图也表达得出来）；
+    其它角色的内容就是内容数组本身。
     """
 
     role: str  # "system" | "user" | "assistant" | "tool"
-    content: str | dict[str, Any] | list[dict[str, Any]] = ""
+    content: str | Block | list[Block] | dict[str, Any] | list[dict[str, Any]] = ""
     name: str | None = None            # role="tool" 时的工具名
     tool_call_id: str | None = None    # role="tool" 时关联的 tool_call.id
     tool_calls: list["ToolCall"] | None = None  # role="assistant" 时的调用请求
@@ -83,33 +121,49 @@ class ToolSchema:
     parameters: dict[str, Any] = field(default_factory=dict)  # JSON Schema object
 
 
-def payload_content(message: Message) -> str | list[dict[str, Any]]:
-    """`Message.content` → 厂商 payload 内容槽位的值（两种形态的**唯一定义处**）。
+def payload_content(message: Message) -> str | list["Block"] | list[dict[str, Any]]:
+    """`Message.content` → 适配器消费的**规范形态**（三种形态的**唯一定义处**）。
 
-    - `str` → 原样返回（provider 自己包块）；
-    - `dict` → 视作单块，包成 `[dict]`；
-    - `list[dict]` → **浅拷贝后原样透传**（不解释 key，不排序，不改写）。
+    - `str` → 原样返回（适配器自己包成文本块）；
+    - `Block` / `list[Block]` → 返回 `list[Block]`（中立块，适配器翻译成厂商形状）；
+    - `dict` / `list[dict]` → **浅拷贝后原样透传**（厂商原样块，不解释 key）。
 
     非法输入与歧义在这里一次性拒绝（`TypeError`），不让它流到厂商那里变成难查的 400。
     """
     content = message.content
     if isinstance(content, str):
         return content
-    blocks: Any = [content] if isinstance(content, dict) else content
-    if not isinstance(blocks, list):
+    if isinstance(content, (TextBlock, ImageBlock)):
+        blocks: list[Any] = [content]
+    elif isinstance(content, dict):
+        blocks = [content]
+    elif isinstance(content, list):
+        blocks = list(content)
+    else:
         raise TypeError(
-            "Message.content 只能是 str，或 dict / list[dict]（原样形态）；"
+            "Message.content 只能是 str、Block / list[Block]，或 dict / list[dict]（原样形态）；"
             f"收到 {type(content).__name__}"
         )
-    bad = sorted({type(block).__name__ for block in blocks if not isinstance(block, dict)})
-    if bad:
-        raise TypeError(f"Message.content 的原样块必须是 dict，收到：{bad}")
-    if message.tool_calls:
+
+    neutral = [block for block in blocks if isinstance(block, (TextBlock, ImageBlock))]
+    raw = [block for block in blocks if isinstance(block, dict)]
+    if neutral and raw:
         raise TypeError(
-            "Message.content 已是原样块数组，就不要再给 tool_calls（歧义）："
-            "把 tool_use 块自己写进 content，或者 content 用 str、只用 tool_calls"
+            "同一个 content 列表里不能混用「中立块（Block）」与「厂商原样块（dict）」："
+            "语义不明——要么全用 Block（可移植），要么全用 dict（绑定当前厂商）"
         )
-    return [dict(block) for block in blocks]
+    unknown = sorted({type(block).__name__ for block in blocks
+                      if not isinstance(block, (TextBlock, ImageBlock, dict))})
+    if unknown:
+        raise TypeError(f"content 列表里只允许 Block 或 dict，收到：{unknown}")
+    if raw:
+        if message.tool_calls:
+            raise TypeError(
+                "原样 content 与 tool_calls 同时给出是歧义（原样块可能本身就是工具调用）："
+                "要么把工具调用自己写进 content，要么 content 用 str / Block、只用 tool_calls"
+            )
+        return [dict(block) for block in raw]
+    return neutral
 
 
 # ── Provider 产出 ───────────────────────────────────────

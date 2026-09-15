@@ -4,6 +4,42 @@
 v0.3 及更早的记录见 [`archive/v0.3/CHANGELOG.md`](archive/v0.3/CHANGELOG.md)——
 v0.4 是**全新定义**，不背 v0.3 兼容包袱。
 
+## [未发布]
+
+**主题：输入统一 —— 多模态写语义、不写厂商形状（`Block` 中立块）。**
+
+### Added
+
+- **`Block`（中立内容块）**：`TextBlock("…")` / `ImageBlock(url=…)` 或 `ImageBlock(data=…, media_type=…)`。
+  调用方**只写语义**，厂商形状由适配层生成——同一份输入在两个协议下**语义等价**：
+
+  | 你写的 | OpenAI 适配器发出 | Anthropic 适配器发出 |
+  |---|---|---|
+  | `TextBlock("看图")` | `{"type":"text","text":"看图"}` | 同左 |
+  | `ImageBlock(url="https://x/a.png")` | `{"type":"image_url","image_url":{"url":"https://x/a.png"}}` | `{"type":"image","source":{"type":"url","url":"https://x/a.png"}}` |
+  | `ImageBlock(data="QUJD", media_type="image/png")` | `{"type":"image_url","image_url":{"url":"data:image/png;base64,QUJD"}}` | `{"type":"image","source":{"type":"base64","media_type":"image/png","data":"QUJD"}}` |
+
+  `data:…;base64,` 这类厂商编码**只出现在适配层**，调用方看不到。
+- **构造时校验**：`ImageBlock` 既没 `url` 也没 `data`、两个都给、base64 缺 `media_type`、
+  `data` 里带了 `data:` 前缀 → 立刻 `ValueError`（不用等厂商 400）。
+- `Block` 是**封闭集合**（只有 text / image），因此它不可能与工具调用撞车：
+  `content=[TextBlock("我来查")]` + `tool_calls=[…]` 合法；同一个列表里**混用**中立块与厂商原样块
+  则 `TypeError`（语义不明）。
+
+### Changed
+
+- **契约面（词汇表）有意扩了一次**：`weave.core.envelopes.__all__` 从 11 个名字 → 14 个
+  （+`Block` / `TextBlock` / `ImageBlock`）。**接口仍是 2 个、信封仍是 4 个、顶层公共导出仍是 5 个。**
+  门禁 `test_envelopes_are_the_small_set` 相应更新——这是一次**基变换**，②③ 已同步改。
+- `payload_content()` 从「两种形态」升级为「三种形态」，并新增混用拒绝规则。
+- `client._check_vendor_shape()` 只检查**厂商原样块**（`dict`）：中立块由适配层翻译，不是厂商形状。
+
+### Verified
+
+- 离线测试 **193 passed**（180 原有 + 13 新增）：构造校验 · 两协议翻译**语义等价** ·
+  `data:` 编码只出现在适配层 · 混用拒绝 · 与 `tool_calls` 共存 · 工具结果里的中立块 ·
+  system 块数组 · 原样块仍逐字透传且仍会被错家适配器拦下 · 封闭集合门禁。
+
 ## [0.5.0] - 2026-09-15
 
 **主题：让 weave 能接住厂商独有的东西，同时零新增契约词汇** —— `Message` 原样内容块 ·

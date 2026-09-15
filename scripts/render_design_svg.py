@@ -187,11 +187,11 @@ def build_philosophy() -> Svg:
             ("改动 core = 基变换：②③ 必须同步改，替换测试会拦住不同步", DIM),
             ("正交性预算：每加一个永久冻结的挂载点，就少一格自由度 —— 能不加就不加", FAINT),
         ]),
-        ("能接未知：两种形态共存", OK_E, [
-            ("语义形态 str：weave 负责翻译成厂商形状 → 跨厂商可移植、写法会被校验", WHITE),
-            ("原样形态 dict / list[dict]：weave 不解释任何 key，逐字透传 → 厂商独有能力立刻可达", WHITE),
-            ("适配层按配置拦「别家已知形状」，未知块一律放行 —— 不挡厂商未来", DIM),
-            ("代价写在明处：原样块是厂商形状，换 provider 不可移植", FAINT),
+        ("输入统一：三种形态各就各位", OK_E, [
+            ("中立块 Block：你写语义（TextBlock / ImageBlock），形状由适配层生成 → 跨厂商可移植", WHITE),
+            ("纯文本 str：最常用；适配层按厂商要求包成文本块 → 跨厂商可移植", DIM),
+            ("原样 dict：厂商独有能力（cache_control / thinking 回传）逐字透传 → 绑定当前厂商", DIM),
+            ("三种形态不可混用；Block 是封闭集合，所以能和 tool_calls 共存", FAINT),
         ]),
         ("不许静默", APP_E, [
             ("解不出工具调用不是错误（残留文本仍在 content 里）；但「说不出来」必须显式失败", WHITE),
@@ -214,96 +214,91 @@ def build_philosophy() -> Svg:
 # 图二：架构
 # ══════════════════════════════════════════════════════════
 def build_architecture() -> Svg:
+    """一条链 + 两张"收齐表"：每段只写自己的事，没有独立的第四块。
+
+    - 输入形态出现在**①的输入那一行**（它本来就是那个字段的取值）；
+    - 失败 8 类出现在**②的失败那一行**（它本来就产生在那里）；
+    - 词表是**上面出现过的类型的定义处**（每个名字都标了它出现在哪一段）；
+    - 守则是**对上面每一段的机械保证**（每条都注明它守的是谁）。
+    """
     svg = Svg(PAGE_W, 0)
-    left_x, left_w = M, 768
-    right_x, right_w = 828, PAGE_W - M - 828
+    full_w = PAGE_W - M * 2
+    mid = M + full_w / 2
+
+    def band(title: str, accent: str, lines: list, y: float, *, face: str = PANEL) -> float:
+        return svg.panel(M, y, full_w, title, lines, accent=accent, face=face)
+
+    def step(y: float, label: str, color: str) -> float:
+        svg.arrow(mid, y + 4, mid, y + 30, color=color)
+        svg.text(mid + 12, y + 21, label, size=FS_NOTE, color=color)
+        return y + 40
+
     y = M
-    svg.text(left_x, y + FS_BIG, "Weave 架构 · 一个功能：LLM 交互",
+    svg.text(M, y + FS_BIG, "Weave 架构 · 一个功能：LLM 交互",
              size=FS_BIG, color=TITLE, weight="bold")
-    svg.text(PAGE_W - M, y + FS_BIG, "docs/weave-llm-dimension.md",
+    svg.text(PAGE_W - M, y + FS_BIG, "docs/weave-global-architecture.md",
              size=FS_NOTE, color=FAINT, anchor="end")
-    y += FS_BIG + 10
-    svg.text(left_x, y,
-             "对象只有一个输入（messages + 可选 tools）和一个输出（LLMResponse）；"
-             "上下文、执行、循环都由应用自己组装", size=FS_SUB, color=DIM)
-    y += LINE_H + GAP
+    y += FS_BIG + 16
+    for line in (
+        "一个输入（messages + 可选 tools）→ 一个输出（归一后的 LLMResponse）。",
+        "每段只写它自己的事；最后两张表把「上面用到的词」与「要守的规矩」收齐。",
+    ):
+        svg.text(M, y, line, size=FS_SUB, color=DIM)
+        y += LINE_H - 3
+    y += 18
 
-    app_y = y
-    y = svg.panel(left_x, y, left_w, "应用 / 业务（外部）—— 编排与组合都在这里", [
-        ("自己决定：上下文从哪来 · 工具怎么执行 · 循环几轮 · 什么时候停", WHITE),
-        ("需要跨多次交互的能力一律不在 weave（所以它也从不替你决定这些）", DIM),
-    ], accent=APP_E) + GAP
-    svg.arrow(left_x + left_w / 2, app_y + (y - GAP - app_y), left_x + left_w / 2, y - 4,
-              color=APP_E)
-    svg.text(left_x + left_w / 2 + 10, y - GAP / 2 + 4, "messages（+ 可选 tools）",
-             size=FS_NOTE, color=APP_E)
+    # ① 应用：输入形态就写在这里（它本来就是 Message.content 的取值）
+    y = band("① 应用 / 业务（外部）", APP_E, [
+        ("输入　messages + tools　｜　三种取值：纯文本 / 中立块 / 原样厂商块"
+         "（谁翻译：适配层 / 适配层 / 调用方）", WHITE),
+        ("输出　LLMResponse（正常）｜ TypedFailure（失败，8 类）　—— 这两个名字都出自词表", DIM),
+        ("自己决定　循环 · 上下文 · 执行 · 编排（需要跨多次交互的，都不在 weave）", FAINT),
+    ], y)
+    y = step(y, "messages（+ 可选 tools）", APP_E)
 
-    obj_y = y
-    y = svg.panel(left_x, y, left_w, "weave.llm(...) —— 对象：LLM 交互（weave 唯一功能）", [
-        ("对外只有四个方法：call · call_streaming · stream · aclose", WHITE),
-        ("发请求前预检：适配器自述 protocol / foreign_block_types / block_shape_hint", WHITE),
-        ("　　　　　　→ 拦「别家形状」的块；未知块一律放行；shape_check=False 可关", DIM),
-        ("reliability：单次超时 · 指数退避+抖动重放 · Retry-After · 总预算 · 取消 · 8 类分类", DIM),
-        ("decode：原生 tool_calls / DSML / 围栏 JSON → ToolCall（arguments 已是 dict）", DIM),
-        ("usage：厂商字段归一（含 prompt cache）+ 对象级累计 · observer：注入回调，默认不上报", DIM),
-        ("输入两种形态：str（语义：适配层翻译）／ dict·list[dict]（原样：逐字透传，不解释 key）", WHITE),
-        ("输出：LLMResponse（content · reasoning · tool_calls · usage · attempts ·", DIM),
-        ("　　　 elapsed_ms · finish_reason · failure · raw · raw_blocks）", DIM),
-    ], accent=OBJ_E) + GAP
-    svg.arrow(left_x + left_w / 2, obj_y + (y - GAP - obj_y), left_x + left_w / 2, y - 4,
-              color=OBJ_E)
-    svg.text(left_x + left_w / 2 + 10, y - GAP / 2 + 4, "CallRequest（哑原子：一次调用，失败即抛）",
-             size=FS_NOTE, color=OBJ_E)
+    # ② 对象层：失败 8 类就写在这里（它产生在这里）
+    y = band("② weave.llm —— 对象层（一次动作的生命周期）", OBJ_E, [
+        ("call · call_streaming · stream · aclose", WHITE),
+        ("预检 shape_check · reliability · decode · usage · streaming · "
+         "回填构造器（as_message / tool_result）", DIM),
+        ("失败在这里被归类：TypedFailure 的 8 个 kind —— 可重试 4 类 / 不可重试 4 类", DIM),
+    ], y)
+    y = step(y, "CallRequest（哑原子：一次调用，失败即抛）", OBJ_E)
 
-    atom_y = y
-    y = svg.panel(left_x, y, left_w, "厂商适配层 —— LLMProvider 实现（哑原子 · 可替换）", [
-        ("OpenAIHTTPProvider：/chat/completions · 零第三方依赖（stdlib urllib + 自写 SSE）", WHITE),
-        ("AnthropicHTTPProvider：/v1/messages · system 顶层参数 · tool_result 块 · 事件流", WHITE),
-        ("FakeProvider（离线确定性）· 可注入 Transport（协议适配因此可离线验收）", DIM),
-        ("厂商形状翻译 + 认证/端点 + 参数差异过滤；重试 · 超时 · 解码都不在这里", DIM),
-    ], accent=ATOM_E) + GAP
-    svg.arrow(left_x + left_w / 2, atom_y + (y - GAP - atom_y), left_x + left_w / 2, y - 4,
-              color=ATOM_E)
-    svg.text(left_x + left_w / 2 + 10, y - GAP / 2 + 4, "HTTP / SSE", size=FS_NOTE, color=ATOM_E)
+    # ③ 适配层：厂商差异在这里被吃掉
+    y = band("③ weave.providers —— 适配层（哑原子 · 可替换）", ATOM_E, [
+        ("OpenAIHTTPProvider · AnthropicHTTPProvider · FakeProvider · 可注入 Transport", WHITE),
+        ("厂商差异在这里被吃掉：认证 · 端点 · 参数 · 形状（三种输入形态也在这里落地）", DIM),
+        ("纪律　不重试 · 不计时 · 不分类 · 不解码 —— 它只做翻译", FAINT),
+    ], y)
+    y = step(y, "HTTP / SSE", ATOM_E)
 
-    y = svg.panel(left_x, y, left_w, "厂商（weave 之外）", [
+    # ④ 厂商
+    y = band("④ 厂商（外部）", VENDOR_E, [
         ("OpenAI 兼容端点（OpenAI / DeepSeek / 通义 / Ollama / vLLM / 各类网关）", DIM),
-        ("Anthropic 原生 Messages API · 以及任何兼容网关", DIM),
-    ], accent=VENDOR_E)
+        ("Anthropic 原生 Messages API · 以及任何兼容网关　—— 上面那些差异的来源", DIM),
+    ], y)
 
-    # ── 右列：②③ 共用的词表（不是栈里的一级） ──
-    core_lines = [
+    # ── 收齐表 1：上面出现过的词，全部在这里定义 ──
+    y += 22
+    y = band("收齐 1 · 词表 weave.core —— 上面出现过的类型，全部在这里定义"
+             "（②③ 共用，不是栈里的一级）", CORE_E, [
         ("接口　LLMProvider · StateStore", WHITE),
-        ("词汇　Message · ToolCall · ToolSchema", DIM),
-        ("　　　LLMResponse · StreamChunk", DIM),
-        ("信封　CallRequest · Invocation · TypedFailure", DIM),
-        ("失败　可重试 rate_limit · server ·", DIM),
-        ("　　　network · timeout", DIM),
-        ("　　　不可重试 auth · bad_request ·", DIM),
-        ("　　　rejected · parse_error", DIM),
-        ("规则　payload_content：str → 语义形态", DIM),
-        ("　　　dict / list[dict] → 原样透传", DIM),
-        ("　　　原样块 + tool_calls = 歧义，", DIM),
-        ("　　　发请求前 TypeError", DIM),
-        ("纪律　改动 = 基变换：②③ 同步改，", DIM),
-        ("　　　替换测试全绿", DIM),
-    ]
-    core_bottom = svg.panel(right_x, app_y, right_w,
-                            "契约与词汇（weave.core）", core_lines, accent=CORE_E,
-                            face=PANEL_DEEP)
-    svg.text(right_x + PAD, core_bottom + LINE_H,
-             "②③ 共用；core 自己", size=FS_NOTE, color=CORE_E)
-    svg.text(right_x + PAD, core_bottom + LINE_H * 2,
-             "不依赖任何 weave 模块", size=FS_NOTE, color=CORE_E)
-    svg.arrow(left_x + left_w, app_y + 60, right_x - 6, app_y + 60, color=CORE_E, lw=1.5)
-    svg.arrow(left_x + left_w, atom_y + 60, right_x - 6, atom_y + 60, color=CORE_E, lw=1.5)
+        ("词汇　Message · Block（①的输入）· ToolCall · ToolSchema（工具往返）· "
+         "LLMResponse（②的输出）· StreamChunk（流式）", DIM),
+        ("信封　CallRequest（② → ③）· Invocation（② 内部）· TypedFailure（② 的失败出口）", DIM),
+        ("失败　可重试 rate_limit · server · network · timeout　｜　"
+         "不可重试 auth · bad_request · rejected · parse_error", DIM),
+    ], y, face=PANEL_DEEP)
 
-    y = max(y, core_bottom + LINE_H * 2) + GAP
-    y = svg.panel(M, y, PAGE_W - M * 2, None, [
-        ("依赖只有三个方向：应用 → 对象；对象 → 适配层；②③ 各自 → core"
-         "（core 不依赖任何 weave 模块）。", WHITE),
-        ("厂商知识只存在于适配层：对象层不认识任何厂商，Message 里也没有厂商名。", DIM),
-    ], accent=VENDOR_E) + M
+    # ── 收齐表 2：对上面每一段的机械保证 ──
+    y += 22
+    y = band("收齐 2 · 守则 · 不变量与门禁 —— 机械执行上面每一段（违反即测试红）", VENDOR_E, [
+        ("契约面（就是上面那份词表）接口 2 个不得膨胀 · 已归档的名字必须真的不存在", DIM),
+        ("原子层（③ 与 stores）不得 import 上层 · ③ 不得出现 Invocation · core 零第三方依赖", DIM),
+        ("② 不得 import 存储 · 替换测试：换适配器 → 对象层与调用方零改动 · "
+         "改 core = 基变换（②③ 同步改）", WHITE),
+    ], y) + M
     svg.height = y
     return svg
 

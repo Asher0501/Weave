@@ -39,6 +39,13 @@ resp.model
 resp.as_message()                 # → assistant 消息（content + tool_calls）
 Message.tool_result(call, output) # → role="tool" 消息（name / tool_call_id 自动对上）
 
+# 多模态：写语义，形状由适配层生成（一份输入两个协议通用）
+from weave.core.types import TextBlock, ImageBlock
+messages = [Message(role="user", content=[
+    TextBlock("看图"),
+    ImageBlock(url="https://x/a.png"),          # 或 ImageBlock(data=b64, media_type="image/png")
+])]
+
 # 流式：同一个动作的另一种呈现（可选）
 async for chunk in w.stream(messages, tools=[...]):
     ...
@@ -59,8 +66,9 @@ weave/llm/                     ← 对象层（本维度）
   usage.py       计量归一       各厂商 usage 字段 → 统一口径
   streaming.py   流式聚合       增量 chunk → 完整响应（tool_calls 按 index 归并）
 weave/core/                     ← 契约与词汇（②③ 共用的词表，不是栈里的一级）
-  types.py         Message / ToolCall / ToolSchema / LLMResponse / StreamChunk
-                   + payload_content()：str=语义形态 / dict·list[dict]=原样形态 的唯一定义处
+  types.py         Message / Block（TextBlock · ImageBlock）/ ToolCall / ToolSchema /
+                   LLMResponse / StreamChunk
+                   + payload_content()：str · Block · 原样 dict 三种形态的唯一定义处
   envelopes.py     CallRequest / Invocation / TypedFailure + 失败分类（8 类）
   errors.py        类型化错误；interfaces.py：LLMProvider · StateStore
 weave/providers/                ← 厂商适配层（哑原子：一次调用，失败即抛，不重试不计时不解码）
@@ -84,7 +92,10 @@ weave/providers/                ← 厂商适配层（哑原子：一次调用�
 - [x] A2 `assistant.tool_calls` 回传格式正确；`tool` 消息必带 `tool_call_id`（V1）
 - [x] A3 厂商差异过滤：如 `deepseek-reasoner` 不接受 `temperature/top_p`（V1）
 - [x] A4 `reasoning` 内容**绝不回传**给下一次请求（V1）
-- [x] A5 原样内容块（多模态 / 厂商独有块）逐字透传，weave **不解释任何 key**（原 V2，本轮实现；零新增词汇）
+- [x] A5 原样内容块（厂商独有块）逐字透传，weave **不解释任何 key**（V1）
+- [x] A9 **输入统一**：中立块 `TextBlock` / `ImageBlock` 由适配层翻译成厂商形状——同一份输入在两个
+      协议下**语义等价**（形状不同）；构造时校验；与原样 dict **不可混用**；与 `tool_calls` 可共存
+      （`Block` 是封闭集合）；`data:…;base64,` 这类厂商编码只出现在适配层（V1）
 - [x] A6 原样块与 `tool_calls` 同时给出视为歧义 → 在**发出任何请求之前** `TypeError`，
       且**不得进入可靠性重放**（否则编程错误会被归成可重试的 `server` 并退避重放）（V1）
 - [x] A7 `role="tool"` 的原样 content 是 `tool_result` **内层**内容（工具可返回图片）；

@@ -24,7 +24,16 @@ from typing import Any
 from weave.core.envelopes import CallRequest
 from weave.core.errors import ProviderError, classify_http_error
 from weave.core.interfaces import LLMProvider
-from weave.core.types import LLMResponse, Message, StreamChunk, ToolCall, ToolSchema, payload_content
+from weave.core.types import (
+    ImageBlock,
+    LLMResponse,
+    Message,
+    StreamChunk,
+    TextBlock,
+    ToolCall,
+    ToolSchema,
+    payload_content,
+)
 from weave.providers.sse import iter_sse_events
 from weave.providers.transport import (
     HTTPResponse,
@@ -37,6 +46,7 @@ from weave.providers.transport import (
 __all__ = [
     "AnthropicHTTPProvider",
     "build_anthropic_payload",
+    "content_to_anthropic",
     "messages_to_anthropic",
     "join_system",
     "tools_to_anthropic",
@@ -67,6 +77,32 @@ _STOP_REASON = {
 # ── 纯函数：请求构造 ────────────────────────────────────
 
 
+def content_to_anthropic(content: Any) -> str | list[dict[str, Any]]:
+    """规范形态（`payload_content()` 的输出）→ Anthropic 内容槽位的值。
+
+    - `str` → 原样（Anthropic 的 content 可以是字符串）；
+    - **中立块** → 翻译：`TextBlock` → `text` 块；`ImageBlock` → `image` + `source`
+      （`url` 走 `source.type="url"`，base64 走 `source.type="base64"` + `media_type`）；
+    - **原样 dict** → 逐字透传（调用方显式选择了厂商形状，weave 不看 key）。
+
+    所以调用方只写 `Block`，形状差异在这一层被吃掉。
+    """
+    if isinstance(content, str) or not content:
+        return content
+    if isinstance(content[0], dict):        # 原样块：不解释、不改写
+        return content
+    out: list[dict[str, Any]] = []
+    for block in content:
+        if isinstance(block, TextBlock):
+            out.append({"type": "text", "text": block.text})
+        elif block.url:
+            out.append({"type": "image", "source": {"type": "url", "url": block.url}})
+        else:
+            out.append({"type": "image", "source": {
+                "type": "base64", "media_type": block.media_type, "data": block.data}})
+    return out
+
+
 def messages_to_anthropic(
     messages: Sequence[Message],
 ) -> tuple[str | list[dict[str, Any]] | None, list[dict[str, Any]]]:
@@ -78,7 +114,8 @@ def messages_to_anthropic(
     2. `assistant.tool_calls` → `tool_use` 内容块；
     3. `role="tool"` → `user` 消息里的 `tool_result` 块，且**相邻的合并进同一条 user 消息**
        （Anthropic 要求 tool_result 跟在 tool_use 之后，不能拆成多条 user）；
-    4. `content` 是原样形态（dict / list[dict]）时**逐字透传**，weave 不看 key。
+    4. `content` 三种形态：`str` 原样 · `Block` / `list[Block]` **翻译成 Anthropic 块** ·
+       原样 dict **逐字透传**（weave 不看 key）。
     """
     raw_system: list[Any] = []
     out: list[dict[str, Any]] = []
@@ -96,7 +133,7 @@ def messages_to_anthropic(
         out.append(message)
 
     for message in messages:
-        content = payload_content(message)      # 原样形态在这里归一；歧义在这里报错
+        content = content_to_anthropic(payload_content(message))   # 三种形态在这里归一
         if message.role == "system":
             if content:
                 raw_system.append(content)
@@ -113,8 +150,11 @@ def messages_to_anthropic(
             continue
         if message.role == "assistant" and message.tool_calls:
             blocks: list[dict[str, Any]] = []
-            if content:
-                blocks.append({"type": "text", "text": content})
+            if isinstance(content, str):
+                if content:
+                    blocks.append({"type": "text", "text": content})
+            else:
+                blocks.extend(content)      # 中立块 / 原样块：已经是 Anthropic 形状
             for call in message.tool_calls:
                 arguments = call.arguments
                 if isinstance(arguments, str):

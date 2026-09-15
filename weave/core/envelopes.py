@@ -22,9 +22,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from weave.core.types import (
+    Block,
+    ImageBlock,
     LLMResponse,
     Message,
     StreamChunk,
+    TextBlock,
     ToolCall,
     ToolSchema,
 )
@@ -36,6 +39,9 @@ __all__ = [
     "TypedFailure",
     # 基础词汇（再导出）
     "Message",
+    "Block",
+    "TextBlock",
+    "ImageBlock",
     "ToolCall",
     "ToolSchema",
     "LLMResponse",

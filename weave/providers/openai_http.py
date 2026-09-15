@@ -17,7 +17,16 @@ from typing import Any
 from weave.core.envelopes import CallRequest
 from weave.core.errors import ProviderError, classify_http_error
 from weave.core.interfaces import LLMProvider
-from weave.core.types import LLMResponse, Message, StreamChunk, ToolCall, ToolSchema, payload_content
+from weave.core.types import (
+    ImageBlock,
+    LLMResponse,
+    Message,
+    StreamChunk,
+    TextBlock,
+    ToolCall,
+    ToolSchema,
+    payload_content,
+)
 from weave.providers.sse import iter_sse_events
 from weave.providers.transport import (
     HTTPResponse,
@@ -30,6 +39,7 @@ from weave.providers.transport import (
 __all__ = [
     "OpenAIHTTPProvider",
     "build_payload",
+    "content_to_openai",
     "messages_to_payload",
     "tools_to_payload",
     "filter_sampling_params",
@@ -53,17 +63,42 @@ _SAMPLING_PARAMS = (
 # ── 纯函数：请求构造（A1/A2/A3） ────────────────────────
 
 
+def content_to_openai(content: Any) -> str | list[dict[str, Any]]:
+    """规范形态（`payload_content()` 的输出）→ OpenAI 内容槽位的值。
+
+    - `str` → 原样；
+    - **中立块** → 翻译：`TextBlock` → `text` 块；`ImageBlock` → `image_url` 块
+      （base64 会被拼成 `data:{media_type};base64,{data}` 的 data URI——**这是 OpenAI 的编码习惯，
+      只在这一层出现**，调用方看不到）；
+    - **原样 dict** → 逐字透传。
+    """
+    if isinstance(content, str) or not content:
+        return content
+    if isinstance(content[0], dict):        # 原样块：不解释、不改写
+        return content
+    out: list[dict[str, Any]] = []
+    for block in content:
+        if isinstance(block, TextBlock):
+            out.append({"type": "text", "text": block.text})
+        else:
+            url = block.url or f"data:{block.media_type};base64,{block.data}"
+            out.append({"type": "image_url", "image_url": {"url": url}})
+    return out
+
+
 def messages_to_payload(messages: Sequence[Message]) -> list[dict[str, Any]]:
     """Message → 厂商 messages。
 
     - `assistant.tool_calls` 按 OpenAI 形状回传；`tool` 消息必带 `tool_call_id`（A2）
     - `Message` 结构里没有 reasoning 字段 → 推理内容天然不回传（A4）
     - `content` 是原样形态（dict / list[dict]）时**逐字透传**：weave 不看 key，
-      所以 `image_url` / `cache_control` / 厂商新块都能直接用（代价见 Message 文档）
+      所以 `image_url` / 厂商新块都能直接用（代价见 Message 文档）；
+      `Block` / `list[Block]`（中立块）会被**翻译**成 OpenAI 形状。
     """
     out: list[dict[str, Any]] = []
     for message in messages:
-        entry: dict[str, Any] = {"role": message.role, "content": payload_content(message)}
+        entry: dict[str, Any] = {"role": message.role,
+                                "content": content_to_openai(payload_content(message))}
         if message.role == "assistant" and message.tool_calls:
             entry["tool_calls"] = [
                 {

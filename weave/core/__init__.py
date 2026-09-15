@@ -32,9 +32,12 @@ from weave.core.errors import (
 )
 from weave.core.interfaces import LLMProvider, StateStore
 from weave.core.types import (
+    Block,
+    ImageBlock,
     LLMResponse,
     Message,
     StreamChunk,
+    TextBlock,
     ToolCall,
     ToolSchema,
 )
@@ -42,6 +45,9 @@ from weave.core.types import (
 __all__ = [
     # types
     "Message",
+    "Block",
+    "TextBlock",
+    "ImageBlock",
     "ToolCall",
     "ToolSchema",
     "LLMResponse",

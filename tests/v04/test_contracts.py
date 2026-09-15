@@ -138,7 +138,8 @@ def test_envelopes_are_the_small_set():
 
     assert set(E.__all__) == {
         "CallRequest", "Invocation", "TypedFailure",
-        "Message", "ToolCall", "ToolSchema", "LLMResponse", "StreamChunk",
+        "Message", "Block", "TextBlock", "ImageBlock",
+        "ToolCall", "ToolSchema", "LLMResponse", "StreamChunk",
         "RETRYABLE_KINDS", "NON_RETRYABLE_KINDS", "classify_exception",
     }
     for gone in ("Scope", "Record", "RecallRequest", "RememberRequest", "Context",

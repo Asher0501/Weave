@@ -1,10 +1,10 @@
-"""原样内容块（dict / list[dict]）的透传与闭环。
+"""内容块的三种形态：`str` / `Block`（中立）/ `dict`（厂商原样）。
 
-这次只放开一个口子：`Message.content` 可以是 dict / list[dict]，weave **不解释任何 key**、
-逐字透传；同时响应侧保留厂商原始块（`LLMResponse.raw_blocks`），让 thinking 块 /
-多模态结果能无损回填下一轮。
+- `str`：适配层按厂商要求包成文本块，跨厂商可移植；
+- `Block`（`TextBlock` / `ImageBlock`）：**你写语义、适配层生成形状** —— 输入统一的关键；
+- `dict`：厂商原样块，逐字透传、weave 不解释 key（代价是换 provider 不可移植）。
 
-刻意**没有**引入 `Block` 之类的新词汇：契约面一个名字都没长（见最后一节）。
+响应侧保留厂商原始块（`LLMResponse.raw_blocks`），让 thinking / 多模态块能无损回填下一轮。
 """
 from __future__ import annotations
 
@@ -14,7 +14,14 @@ from typing import Any
 
 import pytest
 
-from weave.core.types import LLMResponse, Message, ToolCall, payload_content
+from weave.core.types import (
+    ImageBlock,
+    LLMResponse,
+    Message,
+    TextBlock,
+    ToolCall,
+    payload_content,
+)
 from weave.llm import llm
 from weave.providers.anthropic_http import (
     AnthropicHTTPProvider,
@@ -247,12 +254,19 @@ def test_llmresponse_block_field_defaults_to_none():
     assert LLMResponse(content="x").raw_blocks is None
 
 
-def test_no_new_vocabulary_was_introduced():
+def test_block_vocabulary_is_closed_and_deliberate():
+    """契约面（词汇表）有意扩过一次：从「零新增」改成「只加一个**封闭**的内容块集合」。
+
+    这条锁的是**扩张的方式**：`Block` 就是 `TextBlock | ImageBlock` 这一个封闭联合，
+    没有顺手长出一堆块类型；内部归一函数仍不进契约面。
+    """
     import weave.core.envelopes as E
     import weave.core.types as T
 
-    assert not hasattr(T, "Block") and not hasattr(E, "Block"), "没有引入 Block 词汇"
+    assert T.Block == (T.TextBlock | T.ImageBlock)
+    assert (E.TextBlock, E.ImageBlock) == (T.TextBlock, T.ImageBlock)   # 两处同一对象（再导出）
     assert not hasattr(E, "payload_content"), "内部归一函数不进契约面"
+    assert isinstance(T.TextBlock("x"), T.Block) and isinstance(T.ImageBlock(url="u"), T.Block)
 
 
 # ── 7. 适配层的"错家形状"预检（配置决定用哪家的字段） ────
@@ -354,3 +368,141 @@ def test_provider_without_declaration_is_not_checked():
     client = llm(provider=provider)
     run(client.call([Message(role="user", content=[OPENAI_IMAGE])]))
     assert len(provider.calls) == 1
+
+
+# ── 8. 中立块（Block）：输入统一的落点 ──────────────────
+
+
+def test_image_block_validates_at_construction():
+    with pytest.raises(ValueError):                       # 既没 url 也没 data
+        ImageBlock()
+    with pytest.raises(ValueError):                       # 两个都给了
+        ImageBlock(url="https://x/y.png", data="AA", media_type="image/png")
+    with pytest.raises(ValueError):                       # base64 但没 media_type
+        ImageBlock(data="AA")
+    with pytest.raises(ValueError):                       # data 里带了 data URI 前缀
+        ImageBlock(data="data:image/png;base64,AA", media_type="image/png")
+    assert ImageBlock(url="https://x/y.png").url == "https://x/y.png"
+    assert ImageBlock(data="AA", media_type="image/png").media_type == "image/png"
+
+
+def test_blocks_are_frozen_values():
+    with pytest.raises(Exception):
+        TextBlock("x").text = "y"                         # frozen：构造后不可改
+    assert TextBlock("x") == TextBlock("x")
+
+
+def test_payload_content_accepts_both_new_forms():
+    single = payload_content(Message(role="user", content=TextBlock("看图")))
+    assert single == [TextBlock("看图")]
+    blocks = [TextBlock("看图"), ImageBlock(url="https://x/y.png")]
+    assert payload_content(Message(role="user", content=blocks)) == blocks
+    assert payload_content(Message(role="user", content="纯文本")) == "纯文本"
+
+
+def test_mixing_neutral_blocks_with_vendor_dicts_is_rejected():
+    with pytest.raises(TypeError) as err:
+        payload_content(Message(role="user", content=[TextBlock("x"), OPENAI_IMAGE]))
+    assert "混用" in str(err.value)
+
+
+def test_neutral_blocks_may_coexist_with_tool_calls():
+    call = ToolCall(id="c1", name="t", arguments={})
+    content = payload_content(Message(role="assistant", content=[TextBlock("我来调用")],
+                                      tool_calls=[call]))
+    assert content == [TextBlock("我来调用")]        # Block 是封闭集合 → 不与 tool_calls 冲突
+
+
+def _semantic(parts: list[dict]) -> list[tuple]:
+    """把两家厂商的内容数组拍成语义三元组，用来断言「输入统一」真的等价。"""
+    out: list[tuple] = []
+    for part in parts:
+        kind = part.get("type")
+        if kind == "text":
+            out.append(("text", part["text"]))
+        elif kind == "image_url":                        # OpenAI 形状
+            url = part["image_url"]["url"]
+            if url.startswith("data:"):
+                head, _, encoded = url.partition(",")
+                out.append(("image", "base64", head[5:].split(";")[0], encoded))
+            else:
+                out.append(("image", "url", url))
+        elif kind == "image":                            # Anthropic 形状
+            source = part["source"]
+            if source["type"] == "url":
+                out.append(("image", "url", source["url"]))
+            else:
+                out.append(("image", "base64", source["media_type"], source["data"]))
+    return out
+
+
+def test_same_blocks_produce_semantically_equal_payloads_in_both_protocols():
+    """输入统一的可验收标准：一份 Block 输入 → 两家 payload 语义等价（形状不同）。"""
+    for image in (ImageBlock(url="https://x/y.png"),
+                  ImageBlock(data="QUJD", media_type="image/png")):
+        messages = [Message(role="user", content=[TextBlock("看图"), image])]
+
+        _, anthropic = messages_to_anthropic(messages)
+        openai = messages_to_payload(messages)
+        assert _semantic(anthropic[0]["content"]) == _semantic(openai[0]["content"])
+        assert _semantic(openai[0]["content"]) == (
+            [("text", "看图")] + [("image", "url", "https://x/y.png")] if image.url
+            else [("text", "看图"), ("image", "base64", "image/png", "QUJD")]
+        )
+
+
+def test_base64_encoding_stays_out_of_the_caller_view():
+    """`data:…;base64,` 是 OpenAI 的编码习惯，只出现在它的适配层里。"""
+    messages = [Message(role="user", content=[ImageBlock(data="QUJD", media_type="image/png")])]
+    openai = messages_to_payload(messages)[0]["content"][0]
+    _, anthropic = messages_to_anthropic(messages)
+    assert openai["image_url"]["url"] == "data:image/png;base64,QUJD"
+    assert anthropic[0]["content"][0]["source"] == {
+        "type": "base64", "media_type": "image/png", "data": "QUJD"}
+
+
+def test_anthropic_assistant_blocks_and_tool_calls_share_one_content_array():
+    call = ToolCall(id="t1", name="get_weather", arguments={"city": "北京"})
+    message = Message(role="assistant", content=[TextBlock("我来查")], tool_calls=[call])
+    _, out = messages_to_anthropic([message])
+    assert out[0]["content"] == [
+        {"type": "text", "text": "我来查"},
+        {"type": "tool_use", "id": "t1", "name": "get_weather", "input": {"city": "北京"}},
+    ]
+
+
+def test_tool_result_can_carry_a_neutral_image_block():
+    message = Message(role="tool", content=[ImageBlock(url="https://x/y.png")],
+                      tool_call_id="t1", name="shot")
+    _, anthropic = messages_to_anthropic([message])
+    assert anthropic[0]["content"][0]["content"] == [
+        {"type": "image", "source": {"type": "url", "url": "https://x/y.png"}}]
+    openai = messages_to_payload([message])
+    assert openai[0]["content"] == [{"type": "image_url",
+                                     "image_url": {"url": "https://x/y.png"}}]
+
+
+def test_system_blocks_become_anthropic_block_array():
+    _, _ = messages_to_anthropic([Message(role="user", content="x")])
+    system, _ = messages_to_anthropic([Message(role="system", content=[TextBlock("长提示")])])
+    assert system == [{"type": "text", "text": "长提示"}]
+
+
+def test_neutral_blocks_survive_the_object_layer_and_shape_check():
+    client, transport = anthropic_client()               # Anthropic 实例
+    run(client.call([Message(role="user", content=[ImageBlock(url="https://x/y.png")])]))
+    wire = transport.calls[0]["payload"]["messages"][0]["content"]
+    assert wire == [{"type": "image", "source": {"type": "url", "url": "https://x/y.png"}}]
+
+
+def test_vendor_dicts_are_still_rejected_on_the_wrong_adapter():
+    client, transport = anthropic_client()
+    with pytest.raises(TypeError):                       # OpenAI 形状的 dict 仍会被拦
+        run(client.call([Message(role="user", content=[OPENAI_IMAGE])]))
+    assert transport.calls == []
+
+
+def test_raw_vendor_blocks_still_pass_through_verbatim():
+    block = {"type": "text", "text": "带 cache_control", "cache_control": {"type": "ephemeral"}}
+    system, _ = messages_to_anthropic([Message(role="system", content=[block])])
+    assert system == [block]                             # 一个 key 都没被改
